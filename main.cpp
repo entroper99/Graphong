@@ -46,10 +46,10 @@ int main(int argc, char** argv)
     std::wprintf(L"\033[0m");
 
     TTF_Font* font = TTF_OpenFont("NanumGothic.ttf",16);
-    if (font == nullptr) std::wprintf(L"폰트 로드에 실패하였다.\n");
+    if (font == nullptr) std::wprintf(L"16사이즈의 폰트 로드에 실패하였다.\n");
 
     TTF_Font* smallFont = TTF_OpenFont("NanumGothic.ttf", 10);
-    if (smallFont == nullptr) std::wprintf(L"폰트 로드에 실패하였다.\n");
+    if (smallFont == nullptr) std::wprintf(L"10사이즈의 폰트 로드에 실패하였다.\n");
 
     bool quit = false;
     SDL_Event event;

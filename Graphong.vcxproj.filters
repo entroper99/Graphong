@@ -39,5 +39,11 @@
     <ClCompile Include="cubicSpline.ixx">
       <Filter>소스 파일</Filter>
     </ClCompile>
+    <ClCompile Include="Shapes.ixx">
+      <Filter>소스 파일</Filter>
+    </ClCompile>
+    <ClCompile Include="..\CataCrawl\code\randomRange.ixx">
+      <Filter>소스 파일</Filter>
+    </ClCompile>
   </ItemGroup>
 </Project>

@@ -16,7 +16,7 @@ export void cubicSpline(int dataIndex, int newPointNum)
     //std::cin >> bcInput;
 
     std::wprintf(L"데이터셋 x 오름차순 재배열 완료.\n");
-    std::sort(funcSet[dataIndex]->myPoints.begin(), funcSet[dataIndex]->myPoints.end(), [](const auto& a, const auto& b) { return a[0] < b[0]; });
+    std::sort(funcSet[dataIndex]->myPoints.begin(), funcSet[dataIndex]->myPoints.end(), [](const auto& a, const auto& b) { return a.x < b.x; });
 
     funcSet[dataIndex]->myInterPoints.clear();
 
@@ -51,15 +51,15 @@ export void cubicSpline(int dataIndex, int newPointNum)
         {
             if (i == 0)
             {
-                b(i) = 3.0 * (funcSet[dataIndex]->myPoints[1][1] - funcSet[dataIndex]->myPoints[0][1]);
+                b(i) = 3.0 * (funcSet[dataIndex]->myPoints[1].y - funcSet[dataIndex]->myPoints[0].y);
             }
             else if (i == dataSize - 1)
             {
-                b(i) = 3.0 * (funcSet[dataIndex]->myPoints[i][1] - funcSet[dataIndex]->myPoints[i - 1][1]);
+                b(i) = 3.0 * (funcSet[dataIndex]->myPoints[i].y - funcSet[dataIndex]->myPoints[i - 1].y);
             }
             else
             {
-                b(i) = 3.0 * (funcSet[dataIndex]->myPoints[i + 1][1] - funcSet[dataIndex]->myPoints[i - 1][1]);
+                b(i) = 3.0 * (funcSet[dataIndex]->myPoints[i + 1].y - funcSet[dataIndex]->myPoints[i - 1].y);
             }
         }
         std::cout << b << std::endl;
@@ -72,26 +72,26 @@ export void cubicSpline(int dataIndex, int newPointNum)
 
         for (int i = 0; i < dataSize - 1; i++)
         {
-            float delLargeX = funcSet[dataIndex]->myPoints[i + 1][0] - funcSet[dataIndex]->myPoints[i][0];
-            float a = (2.0 * (funcSet[dataIndex]->myPoints[i][1] - funcSet[dataIndex]->myPoints[i + 1][1])) / pow(1, 3.0) + (x[i + 1] + x[i]) / pow(1, 2.0);
-            float b = (3.0 * (funcSet[dataIndex]->myPoints[i + 1][1] - funcSet[dataIndex]->myPoints[i][1])) / pow(1, 2.0) - 2.0 * x[i] / pow(1, 1.0) - x[i + 1] / pow(1, 1.0);
+            float delLargeX = funcSet[dataIndex]->myPoints[i + 1].x - funcSet[dataIndex]->myPoints[i].x;
+            float a = (2.0 * (funcSet[dataIndex]->myPoints[i].y - funcSet[dataIndex]->myPoints[i + 1].y)) / pow(1, 3.0) + (x[i + 1] + x[i]) / pow(1, 2.0);
+            float b = (3.0 * (funcSet[dataIndex]->myPoints[i + 1].y - funcSet[dataIndex]->myPoints[i].y)) / pow(1, 2.0) - 2.0 * x[i] / pow(1, 1.0) - x[i + 1] / pow(1, 1.0);
             float c = x[i];
-            float d = funcSet[dataIndex]->myPoints[i][1];
+            float d = funcSet[dataIndex]->myPoints[i].y;
 
             std::wprintf(L"[%d]번째 Cubic 보간함수의 계수는 (%f,%f,%f,%f)이다.\n", i, a, b, c, d);
 
-            float del = (funcSet[dataIndex]->myPoints[i + 1][0] - funcSet[dataIndex]->myPoints[i][0]) / ((float)newPointNum + 1.0);
+            float del = (funcSet[dataIndex]->myPoints[i + 1].x - funcSet[dataIndex]->myPoints[i].x) / ((float)newPointNum + 1.0);
 
-            funcSet[dataIndex]->myInterPoints.push_back({ funcSet[dataIndex]->myPoints[i][0],funcSet[dataIndex]->myPoints[i][1],0 });
+            funcSet[dataIndex]->myInterPoints.push_back({ funcSet[dataIndex]->myPoints[i].x,funcSet[dataIndex]->myPoints[i].y,0 });
             for (int j = 0; j < newPointNum; j++)
             {
-                float newX = funcSet[dataIndex]->myPoints[i][0] + ((float)j + 1.0) * del;
-                float delX = (newX - funcSet[dataIndex]->myPoints[i][0]) / (funcSet[dataIndex]->myPoints[i + 1][0] - funcSet[dataIndex]->myPoints[i][0]);
+                float newX = funcSet[dataIndex]->myPoints[i].x + ((float)j + 1.0) * del;
+                float delX = (newX - funcSet[dataIndex]->myPoints[i].x) / (funcSet[dataIndex]->myPoints[i + 1].x - funcSet[dataIndex]->myPoints[i].x);
                 float newY = a * pow(delX, 3.0) + b * pow(delX, 2.0) + c * pow(delX, 1.0) + d;
                 funcSet[dataIndex]->myInterPoints.push_back({ newX,newY,0 });
                 std::wprintf(L"새로운 보간점 (%f,%f)를 추가했다!\n", newX, newY);
             }
-            funcSet[dataIndex]->myInterPoints.push_back({ funcSet[dataIndex]->myPoints[i + 1][0],funcSet[dataIndex]->myPoints[i + 1][1],0 });
+            funcSet[dataIndex]->myInterPoints.push_back({ funcSet[dataIndex]->myPoints[i + 1].x,funcSet[dataIndex]->myPoints[i + 1].y,0 });
         }
 
     }

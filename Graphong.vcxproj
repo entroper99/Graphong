@@ -134,6 +134,7 @@
     </Link>
   </ItemDefinitionGroup>
   <ItemGroup>
+    <ClCompile Include="..\CataCrawl\code\randomRange.ixx" />
     <ClCompile Include="constVar.ixx" />
     <ClCompile Include="cubicSpline.ixx" />
     <ClCompile Include="drawer.ixx" />
@@ -142,6 +143,7 @@
     <ClCompile Include="main.cpp" />
     <ClCompile Include="rainbow.ixx" />
     <ClCompile Include="read.ixx" />
+    <ClCompile Include="Shapes.ixx" />
   </ItemGroup>
   <Import Project="$(VCTargetsPath)\Microsoft.Cpp.targets" />
   <ImportGroup Label="ExtensionTargets">

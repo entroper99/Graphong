@@ -15,11 +15,14 @@ import read;
 import rainbow;
 import cubicSpline;
 
-int main(int argc, char** argv) 
+
+int main(int argc, char** argv)
 {
+    bool debugMode = false;
+
     std::locale::global(std::locale("korean"));
     SDL_Init(SDL_INIT_VIDEO);
-    SDL_Window* window = SDL_CreateWindow("Graphong v0.103", SDL_WINDOWPOS_CENTERED, SDL_WINDOWPOS_CENTERED, 640, 480, SDL_WINDOW_OPENGL | SDL_WINDOW_SHOWN);
+    SDL_Window* window = SDL_CreateWindow("Graphong v0.201", SDL_WINDOWPOS_CENTERED, SDL_WINDOWPOS_CENTERED, 640, 480, SDL_WINDOW_OPENGL | SDL_WINDOW_SHOWN);
     SDL_GLContext context = SDL_GL_CreateContext(window);
     SDL_SetRelativeMouseMode(SDL_TRUE); //마우스 숨기기
     glewExperimental = GL_TRUE; //opneGL 실험 기능 활성화
@@ -33,7 +36,7 @@ int main(int argc, char** argv)
     std::wprintf(L"\033[0;37m");
     std::wprintf(L"**********************************************************\n");
     std::wprintf(L"\033[0;33m");
-    std::wprintf(L"Graphong v0.103\n");
+    std::wprintf(L"Graphong v0.201\n");
     std::wprintf(L"\033[0;37m");
     std::wprintf(L"WASD : 이동\n");
     std::wprintf(L"QE : 고도조절\n");
@@ -45,7 +48,7 @@ int main(int argc, char** argv)
     std::wprintf(L"**********************************************************\n");
     std::wprintf(L"\033[0m");
 
-    TTF_Font* font = TTF_OpenFont("NanumGothic.ttf",16);
+    TTF_Font* font = TTF_OpenFont("NanumGothic.ttf", 16);
     if (font == nullptr) std::wprintf(L"16사이즈의 폰트 로드에 실패하였다.\n");
 
     TTF_Font* smallFont = TTF_OpenFont("NanumGothic.ttf", 10);
@@ -67,7 +70,15 @@ int main(int argc, char** argv)
                 if (camPitch > 89.0f) camPitch = 89.0f;
                 if (camPitch < -89.0f) camPitch = -89.0f;
             }
-            else if (event.type == SDL_MOUSEWHEEL) {
+            else if (event.type == SDL_MOUSEBUTTONDOWN)
+            {
+                if (debugMode)
+                {
+                    funcSet[0]->singleTriangulation();
+                }
+            }
+            else if (event.type == SDL_MOUSEWHEEL)
+            {
                 if (state[SDL_SCANCODE_X]) {
                     if (event.wheel.y > 0) {
                         xScale *= 1.1;
@@ -95,7 +106,7 @@ int main(int argc, char** argv)
             }
         }
         //키보드 입력
-        
+
         if (state[SDL_SCANCODE_RETURN])
         {
             std::wprintf(L"----------------------------------------------------------\n");
@@ -107,12 +118,13 @@ int main(int argc, char** argv)
             std::wprintf(L"6.Axis 이름 설정\n");
             if (camFixMinusZ || camFixZ || camFixMinusX || camFixX || camFixMinusY || camFixY) std::wprintf(L"7.Axis 카메라 고정 해제\n");
             else std::wprintf(L"7.2차원 카메라 고정\n");
+            std::wprintf(L"\033[0;33m8.Delaunay 삼각분할\033[0m\n");
             std::wprintf(L"\033[0;33m11.[2차원] Cubic 스플라인 보간 실행\033[0m\n");
             std::wprintf(L"\033[0;33m12.[2차원] 기존 보간값에 대해 선형 보간 실행\033[0m\n");
             if (visDataPoint)  std::wprintf(L"14.데이터점 화면 표시 [ \033[0;32mON\033[0m / OFF ]\n");
-            else std::wprintf(L"14.데이터점 화면 표시  [ ON / \030[0;31mOFF\033[0m ]\n");
+            else std::wprintf(L"14.데이터점 화면 표시  [ ON / \033[1;31mOFF\033[0m ]\n");
             if (visInterPoint)  std::wprintf(L"15.보간점 화면 표시 [ \033[0;32mON\033[0m / OFF ]\n");
-            else std::wprintf(L"15.보간점 화면 표시  [ ON / \030[0;31mOFF\033[0m ]\n");
+            else std::wprintf(L"15.보간점 화면 표시  [ ON / \033[1;31mOFF\033[0m ]\n");
             std::wprintf(L"17.스케일 단위 설정\n");
             std::wprintf(L"18.카메라 속도 설정\n");
             std::wprintf(L"20.데이터 점 크기 조절\n");
@@ -133,13 +145,29 @@ int main(int argc, char** argv)
             if (input == 1)
             {
                 std::string file;
+                std::string fileInput;
                 std::wprintf(L"파일의 경로를 입력해주세요.\n");
-                std::cin >> file;
+                std::wprintf(L"data 폴더부터 파일을 읽습니다. 예를 들어 Graphong/data/test.txt라면 터미널에 test.txt를 입력해주세요.\n");
+                std::wprintf(L"폴더의 경우 Graphong/data/folder/test.txt라면 터미널에 folder/test.txt를 입력해주세요.\n");
+                std::wprintf(L"--------------------------------------------------------------------------------------------------\n");
+                int i = 1;
+                for (const auto& entry : std::filesystem::directory_iterator("data/"))
+                {
+                    if (std::filesystem::is_regular_file(entry.status()))
+                    {
+                        std::wcout << entry.path().filename().wstring();
+                        std::wprintf(L"        ");
+                        if (i % 5 == 0) std::wprintf(L"\n");
+                        i++;
+                    }
+                }
+                std::wprintf(L"\n----------------------------------▼파일 이름을 입력해주세요▼------------------------------------\n");
+                std::cin >> fileInput;
+                file = "data/" + fileInput;
 
                 std::ifstream in(file);
                 if (in.is_open())
                 {
-
                     int startLine = 0;
                     std::wprintf(L"읽기 시작할 행을 입력해주세요.(0부터 시작)\n");
                     std::cin >> startLine;
@@ -171,10 +199,26 @@ int main(int argc, char** argv)
             }
             else if (input == 2)
             {
-                std::wprintf(L"지금부터 f(x,z)=y꼴의 데이터를 읽습니다.\n");
                 std::string file;
+                std::string fileInput;
                 std::wprintf(L"파일의 경로를 입력해주세요.\n");
-                std::cin >> file;
+                std::wprintf(L"data 폴더부터 파일을 읽습니다. 예를 들어 Graphong/data/test.txt라면 터미널에 test.txt를 입력해주세요.\n");
+                std::wprintf(L"폴더의 경우 Graphong/data/folder/test.txt라면 터미널에 folder/test.txt를 입력해주세요.\n");
+                std::wprintf(L"--------------------------------------------------------------------------------------------------\n");
+                int i = 1;
+                for (const auto& entry : std::filesystem::directory_iterator("data/"))
+                {
+                    if (std::filesystem::is_regular_file(entry.status()))
+                    {
+                        std::wcout << entry.path().filename().wstring();
+                        std::wprintf(L"        ");
+                        if (i % 5 == 0) std::wprintf(L"\n");
+                        i++;
+                    }
+                }
+                std::wprintf(L"\n----------------------------------▼파일 이름을 입력해주세요▼------------------------------------\n");
+                std::cin >> fileInput;
+                file = "data/" + fileInput;
 
                 std::ifstream in(file);
                 if (in.is_open())
@@ -405,6 +449,13 @@ int main(int argc, char** argv)
 
                     crosshair = false;
                 }
+            }
+            else if (input == 8)
+            {
+                int dataIndex = 0;
+                std::wprintf(L"몇번째 데이터에 삼각분할을 실행할까? (0 ~ %d).\n", funcSet.size() - 1);
+                std::cin >> dataIndex;
+                funcSet[dataIndex]->triangulation();
             }
             else if (input == 11) //cubic 스플라인 보간 실행
             {
@@ -773,14 +824,14 @@ int main(int argc, char** argv)
                     int minIndex = -1;
                     for (int i = 0; i < funcSet[targetIndex]->myInterPoints.size(); i++)
                     {
-                        if (funcSet[targetIndex]->myInterPoints[i][1] < min)
+                        if (funcSet[targetIndex]->myInterPoints[i].y < min)
                         {
-                            min = funcSet[targetIndex]->myInterPoints[i][1];
+                            min = funcSet[targetIndex]->myInterPoints[i].y;
                             minIndex = i;
                         }
                     }
                     std::wprintf(L"\033[0;33m");
-                    std::wprintf(L"overlap의 최저값은 (%f,%f)이다. 따라서 적절한 σ = %f\n", funcSet[targetIndex]->myInterPoints[minIndex][0], funcSet[targetIndex]->myInterPoints[minIndex][1], funcSet[targetIndex]->myInterPoints[minIndex][0]);
+                    std::wprintf(L"overlap의 최저값은 (%f,%f)이다. 따라서 적절한 σ = %f\n", funcSet[targetIndex]->myInterPoints[minIndex].x, funcSet[targetIndex]->myInterPoints[minIndex].y, funcSet[targetIndex]->myInterPoints[minIndex].x);
                     std::wprintf(L"\033[0m");
 
                     xAxisName = "SIGMA";
@@ -952,7 +1003,10 @@ int main(int argc, char** argv)
             }
         }
 
-
+        float zeroX = 1, zeroY = 1, zeroZ = 1;
+        if (camFixZ || camFixMinusZ) zeroZ = 0;
+        if (camFixY || camFixMinusY) zeroY = 0;
+        if (camFixZ || camFixMinusZ) zeroX = 0;
 
         if (visDataPoint)
         {
@@ -963,7 +1017,7 @@ int main(int argc, char** argv)
                     glPointSize(pointSize);
                     glBegin(GL_POINTS);
                     glColor3f(((float)funcSet[dataIndex]->myColor.r) / 256.0, ((float)funcSet[dataIndex]->myColor.g) / 256.0, ((float)funcSet[dataIndex]->myColor.b) / 256.0);
-                    glVertex3f(xScale * (funcSet[dataIndex]->myPoints[i][0]), yScale * (funcSet[dataIndex]->myPoints[i][1]), zScale * (funcSet[dataIndex]->myPoints[i][2]));
+                    glVertex3f(zeroX * xScale * (funcSet[dataIndex]->myPoints[i].x), zeroY * yScale * (funcSet[dataIndex]->myPoints[i].y), zeroZ * zScale * (funcSet[dataIndex]->myPoints[i].z));
                     glEnd();
                 }
             }
@@ -979,7 +1033,7 @@ int main(int argc, char** argv)
                     glPointSize(pointSize);
                     glBegin(GL_POINTS);
                     glColor3f(((float)funcSet[dataIndex]->myColor.r) / 256.0 / 3.0, ((float)funcSet[dataIndex]->myColor.g) / 256.0 / 3.0, ((float)funcSet[dataIndex]->myColor.b) / 256.0 / 3.0);
-                    glVertex3f(xScale * (funcSet[dataIndex]->myInterPoints[i][0]), yScale * (funcSet[dataIndex]->myInterPoints[i][1]), zScale * (funcSet[dataIndex]->myInterPoints[i][2]));
+                    glVertex3f(zeroX * xScale * (funcSet[dataIndex]->myInterPoints[i].x), zeroY * yScale * (funcSet[dataIndex]->myInterPoints[i].y), zeroZ * zScale * (funcSet[dataIndex]->myInterPoints[i].z));
                     glEnd();
                 }
             }
@@ -996,13 +1050,48 @@ int main(int argc, char** argv)
                         // 라인 그리기
                         glBegin(GL_LINES);
                         glColor3f(((float)funcSet[dataIndex]->myColor.r) / 256.0, ((float)funcSet[dataIndex]->myColor.g) / 256.0, ((float)funcSet[dataIndex]->myColor.b) / 256.0);
-                        glVertex3f(xScale * (funcSet[dataIndex]->myInterPoints[i][0]), yScale * (funcSet[dataIndex]->myInterPoints[i][1]), zScale * (funcSet[dataIndex]->myInterPoints[i][2]));
-                        glVertex3f(xScale * (funcSet[dataIndex]->myInterPoints[i + 1][0]), yScale * (funcSet[dataIndex]->myInterPoints[i + 1][1]), zScale * (funcSet[dataIndex]->myInterPoints[i + 1][2]));
+                        glVertex3f(zeroX * xScale * (funcSet[dataIndex]->myInterPoints[i].x), zeroY * yScale * (funcSet[dataIndex]->myInterPoints[i].y), zeroZ * zScale * (funcSet[dataIndex]->myInterPoints[i].z));
+                        glVertex3f(zeroX * xScale * (funcSet[dataIndex]->myInterPoints[i + 1].x), zeroY * yScale * (funcSet[dataIndex]->myInterPoints[i + 1].y), zeroZ * zScale * (funcSet[dataIndex]->myInterPoints[i + 1].z));
                         glEnd();
                     }
                 }
             }
         }
+
+        for (int dataIndex = 0; dataIndex < funcSet.size(); dataIndex++)
+        {
+            for (int i = 0; i < funcSet[dataIndex]->triangles.size(); i++)
+            {
+                glBegin(GL_LINES);
+                glColor3f(((float)funcSet[dataIndex]->myColor.r) / 256.0, ((float)funcSet[dataIndex]->myColor.g) / 256.0, ((float)funcSet[dataIndex]->myColor.b) / 256.0);
+                glVertex3f(funcSet[dataIndex]->triangles[i].p1.x * zeroX* xScale, funcSet[dataIndex]->triangles[i].p1.y * zeroY* yScale, funcSet[dataIndex]->triangles[i].p1.z * zeroZ* zScale);
+                glVertex3f(funcSet[dataIndex]->triangles[i].p2.x * zeroX* xScale, funcSet[dataIndex]->triangles[i].p2.y * zeroY* yScale, funcSet[dataIndex]->triangles[i].p2.z * zeroZ* zScale);
+                glEnd();
+
+                glBegin(GL_LINES);
+                glColor3f(((float)funcSet[dataIndex]->myColor.r) / 256.0, ((float)funcSet[dataIndex]->myColor.g) / 256.0, ((float)funcSet[dataIndex]->myColor.b) / 256.0);
+                glVertex3f(funcSet[dataIndex]->triangles[i].p1.x * zeroX* xScale, funcSet[dataIndex]->triangles[i].p1.y * zeroY* yScale, funcSet[dataIndex]->triangles[i].p1.z * zeroZ* zScale);
+                glVertex3f(funcSet[dataIndex]->triangles[i].p3.x * zeroX* xScale, funcSet[dataIndex]->triangles[i].p3.y * zeroY* yScale, funcSet[dataIndex]->triangles[i].p3.z * zeroZ* zScale);
+                glEnd();
+
+                glBegin(GL_LINES);
+                glColor3f(((float)funcSet[dataIndex]->myColor.r) / 256.0, ((float)funcSet[dataIndex]->myColor.g) / 256.0, ((float)funcSet[dataIndex]->myColor.b) / 256.0);
+                glVertex3f(funcSet[dataIndex]->triangles[i].p2.x * zeroX* xScale, funcSet[dataIndex]->triangles[i].p2.y * zeroY* yScale, funcSet[dataIndex]->triangles[i].p2.z * zeroZ* zScale);
+                glVertex3f(funcSet[dataIndex]->triangles[i].p3.x * zeroX* xScale, funcSet[dataIndex]->triangles[i].p3.y * zeroY* yScale, funcSet[dataIndex]->triangles[i].p3.z * zeroZ* zScale);
+                glEnd();
+
+
+                //glBegin(GL_TRIANGLES);
+                //glColor3f(((float)funcSet[dataIndex]->myColor.r) / 256.0 / 4.0, ((float)funcSet[dataIndex]->myColor.g) / 256.0 / 4.0, ((float)funcSet[dataIndex]->myColor.b) / 256.0 / 4.0);
+                //glVertex3f(funcSet[dataIndex]->triangles[i].p1.x* xScale, funcSet[dataIndex]->triangles[i].p1.y* yScale, funcSet[dataIndex]->triangles[i].p1.z* zScale);
+                //glVertex3f(funcSet[dataIndex]->triangles[i].p2.x* xScale, funcSet[dataIndex]->triangles[i].p2.y* yScale, funcSet[dataIndex]->triangles[i].p2.z* zScale);
+                //glVertex3f(funcSet[dataIndex]->triangles[i].p3.x* xScale, funcSet[dataIndex]->triangles[i].p3.y* yScale, funcSet[dataIndex]->triangles[i].p3.z* zScale);
+
+                glEnd();
+
+            }
+        }
+
 
         glColor3f(1.0, 1.0, 1.0);
 
@@ -1033,11 +1122,11 @@ int main(int argc, char** argv)
 
 
 
-        if (camFixMinusZ|| camFixZ || camFixMinusX || camFixX || camFixMinusY || camFixY)
+        if (camFixMinusZ || camFixZ || camFixMinusX || camFixX || camFixMinusY || camFixY)
         {
-            drawTextHUD("X-Coord : " + std::to_string(camX/xScale), smallFont, { 255,255,255 }, 320 + 10, 240 + 10);
-            drawTextHUD("Y-Coord : " + std::to_string(camY/yScale), smallFont, { 255,255,255 }, 320 + 10, 240 + 20);
-            drawTextHUD("Z-Coord : " + std::to_string(camZ/zScale), smallFont, { 255,255,255 }, 320 + 10, 240 + 30);
+            drawTextHUD("X-Coord : " + std::to_string(camX / xScale), smallFont, { 255,255,255 }, 320 + 10, 240 + 10);
+            drawTextHUD("Y-Coord : " + std::to_string(camY / yScale), smallFont, { 255,255,255 }, 320 + 10, 240 + 20);
+            drawTextHUD("Z-Coord : " + std::to_string(camZ / zScale), smallFont, { 255,255,255 }, 320 + 10, 240 + 30);
         }
 
 
@@ -1045,7 +1134,7 @@ int main(int argc, char** argv)
         drawTextHUD(graphName, font, { 255,255,255 }, 10, 480 - 30);
 
         //크로스 헤어
-        if(crosshair==true)
+        if (crosshair == true)
         {
             int cX = 320;
             int cY = 240;

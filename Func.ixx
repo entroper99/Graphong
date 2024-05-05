@@ -14,12 +14,12 @@ export struct Func
     std::vector<Point> myInterPoints;
     SDL_Color myColor = { 0xff,0xff,0xff };
 
-    Triangle superTriangle = { { 0, 0, 60 },{ -60, 0, -60 },{ 60, 0, -60 } };
+    Triangle superTriangle;
     std::vector < Triangle > triangles;
 
-    std::vector<Point> selectPts = { superTriangle.p1,superTriangle.p2,superTriangle.p3 };
+    std::vector<Point> selectPts;
     std::vector<Point> unselectPts = myPoints;
-    std::vector<Triangle> checkTriangles = { superTriangle };
+    std::vector<Triangle> checkTriangles;
 
     std::vector<Triangle> badTriangles;
     std::vector<Point> badPts;
@@ -28,47 +28,66 @@ export struct Func
 
     void singleTriangulation()
     {
+        static bool firstRun = true;
+        if (firstRun == true)
+        {
+            double totalX = 0, totalZ = 0;
+            double maxX = -99999, minX = 99999, maxZ = -99999, minZ = 99999;
+            for (int i = 0; i < myPoints.size(); i++)
+            {
+                totalX += myPoints[i].x;
+                if (myPoints[i].x > maxX) maxX = myPoints[i].x;
+                if (myPoints[i].x < minX) minX = myPoints[i].x;
+
+                totalZ += myPoints[i].z;
+                if (myPoints[i].z > maxZ) maxZ = myPoints[i].z;
+                if (myPoints[i].z < minZ) minZ = myPoints[i].z;
+            }
+            double avgX = totalX / myPoints.size(), avgZ = totalZ / myPoints.size();
+            double distX = std::fabs(maxX - minX), distZ = std::fabs(maxZ - minZ);
+            double triSize = 100.0;
+            superTriangle.p1 = { avgX, 0, avgZ - triSize * distZ };
+            superTriangle.p2 = { avgX - triSize * distX, 0, avgZ + triSize * distZ };
+            superTriangle.p3 = { avgX + triSize * distX, 0, avgZ + triSize * distZ };
+            checkTriangles = { superTriangle };
+            selectPts = { superTriangle.p1,superTriangle.p2,superTriangle.p3 };
+
+            unselectPts = myPoints;
+            std::sort(unselectPts.begin(), unselectPts.end(), [](const Point& a, const Point& b) 
+                {
+                double distA = a.x * a.x + a.z * a.z;
+                double distB = b.x * b.x + b.z * b.z;
+                return distA < distB;
+                });
+            firstRun = false;
+        }
+
         if (unselectPts.size() == 0)
         {
-            if (checkTriangles.size() == 1 && checkTriangles[0] == superTriangle)
+            if (deleteSupertri == false)
             {
-                unselectPts = myPoints;
-                std::sort(unselectPts.begin(), unselectPts.end(), [](const Point& a, const Point& b) {
-                    // xz-평면 상의 거리의 제곱을 계산
-                    double distA = a.x * a.x + a.z * a.z;
-                    double distB = b.x * b.x + b.z * b.z;
-                    return distA < distB; // 거리의 제곱이 작은 것이 먼저 오도록 정렬
-                    });
-                checkTriangles = { superTriangle };
+                std::wprintf(L"슈퍼트라이앵글 관련 삼각형을 제거하였다.\n");
+                for (auto it = triangles.begin(); it != triangles.end();)
+                {
+
+                    if (it->p1 == superTriangle.p1 || it->p1 == superTriangle.p2 || it->p1 == superTriangle.p3
+                        || it->p2 == superTriangle.p1 || it->p2 == superTriangle.p2 || it->p2 == superTriangle.p3
+                        || it->p3 == superTriangle.p1 || it->p3 == superTriangle.p2 || it->p3 == superTriangle.p3)
+                    {
+                        it = triangles.erase(it);
+                    }
+                    else
+                    {
+                        it++;
+                    }
+                }
+                std::wprintf(L"삼각분할을 완료하였다.\n");
+                deleteSupertri = true;
+                return;
             }
             else
             {
-                if (deleteSupertri==false)
-                {
-                    std::wprintf(L"슈퍼트라이앵글 관련 삼각형을 제거하였다.\n");
-                    for (auto it = triangles.begin(); it != triangles.end();)
-                    {
-                        
-                        if (it->p1 == superTriangle.p1 || it->p1 == superTriangle.p2 || it->p1 == superTriangle.p3
-                            || it->p2 == superTriangle.p1 || it->p2 == superTriangle.p2 || it->p2 == superTriangle.p3
-                            || it->p3 == superTriangle.p1 || it->p3 == superTriangle.p2 || it->p3 == superTriangle.p3)
-                        {
-                            it = triangles.erase(it);
-                        }
-                        else
-                        {
-                            it++;
-                        }
-                    }
-                    std::wprintf(L"삼각분할을 완료하였다.\n");
-                    deleteSupertri = true;
-                    return;
-                }
-                else
-                {
-                    return;
-                }
-                
+                return;
             }
         }
 
@@ -137,22 +156,13 @@ export struct Func
             {
                 if (edges[j] == edgesCopy[i])
                 {
-                    if (tolerance == false)
-                    {
-                        tolerance = true;
-                    }
+                    if (tolerance == false) tolerance = true;
                     else
                     {
                         for (auto it = edges.begin(); it != edges.end();)
                         {
-                            if (*it == edgesCopy[i])
-                            {
-                                it = edges.erase(it);
-                            }
-                            else
-                            {
-                                ++it;
-                            }
+                            if (*it == edgesCopy[i]) it = edges.erase(it);
+                            else ++it;
                         }
                         goto loopEnd;
                     }
@@ -162,10 +172,7 @@ export struct Func
         }
 
         //std::wprintf(L"▽엣지 개수 (중복 제거 후): %d\n", edges.size());
-        //for (int i = 0; i < edges.size(); i++)
-        //{
-        //    std::wprintf(L"%d번 엣지 : (%f,%f,%f)-(%f,%f,%f) \n", i, edges[i].p1.x, edges[i].p1.y, edges[i].p1.z, edges[i].p2.x, edges[i].p2.y, edges[i].p2.z);
-        //}
+        //for (int i = 0; i < edges.size(); i++) std::wprintf(L"%d번 엣지 : (%f,%f,%f)-(%f,%f,%f) \n", i, edges[i].p1.x, edges[i].p1.y, edges[i].p1.z, edges[i].p2.x, edges[i].p2.y, edges[i].p2.z);
         
         // 뻗어나가는 엣지
         for (int i = 0; i < badPts.size(); i++)
@@ -174,21 +181,15 @@ export struct Func
         }
 
         //std::wprintf(L"엣지 개수 (뻗어나가는 엣지 추가 후): %d\n", edges.size());
-        //for (int i = 0; i < edges.size(); i++)
-        //{
-        //    std::wprintf(L"%d번 엣지 : (%f,%f,%f)-(%f,%f,%f) \n", i, edges[i].p1.x, edges[i].p1.y, edges[i].p1.z, edges[i].p2.x, edges[i].p2.y, edges[i].p2.z);
-        //}
+        //for (int i = 0; i < edges.size(); i++) std::wprintf(L"%d번 엣지 : (%f,%f,%f)-(%f,%f,%f) \n", i, edges[i].p1.x, edges[i].p1.y, edges[i].p1.z, edges[i].p2.x, edges[i].p2.y, edges[i].p2.z);
 
-        auto pointHash = [](const Point& p) {
+        auto pointHash = [](const Point& p) 
+            {
             std::hash<double> hasher;
-            return hasher(p.x) ^ hasher(p.y) ^ hasher(p.z);
+            return ((hasher(p.x) * 73856093) ^ (hasher(p.y) * 19349663) ^ (hasher(p.z) * 83492791));
             };
 
-        auto pointEqual = [](const Point& p1, const Point& p2) {
-            return p1.x == p2.x && p1.y == p2.y && p1.z == p2.z;
-            };
-
-        std::unordered_map<Point, std::vector<Point>, decltype(pointHash), decltype(pointEqual)> edgeMap(0, pointHash, pointEqual);
+        std::unordered_map<Point, std::vector<Point>, decltype(pointHash)> edgeMap(0, pointHash);
 
         // 엣지 맵 생성
         for (const auto& edge : edges) {

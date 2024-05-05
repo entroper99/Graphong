@@ -18,11 +18,11 @@ import cubicSpline;
 
 int main(int argc, char** argv)
 {
-    bool debugMode = false;
+    bool debugMode = true;
 
     std::locale::global(std::locale("korean"));
     SDL_Init(SDL_INIT_VIDEO);
-    SDL_Window* window = SDL_CreateWindow("Graphong v0.201", SDL_WINDOWPOS_CENTERED, SDL_WINDOWPOS_CENTERED, 640, 480, SDL_WINDOW_OPENGL | SDL_WINDOW_SHOWN);
+    SDL_Window* window = SDL_CreateWindow("Graphong", SDL_WINDOWPOS_CENTERED, SDL_WINDOWPOS_CENTERED, 640, 480, SDL_WINDOW_OPENGL | SDL_WINDOW_SHOWN);
     SDL_GLContext context = SDL_GL_CreateContext(window);
     SDL_SetRelativeMouseMode(SDL_TRUE); //마우스 숨기기
     glewExperimental = GL_TRUE; //opneGL 실험 기능 활성화
@@ -36,7 +36,7 @@ int main(int argc, char** argv)
     std::wprintf(L"\033[0;37m");
     std::wprintf(L"**********************************************************\n");
     std::wprintf(L"\033[0;33m");
-    std::wprintf(L"Graphong v0.201\n");
+    std::wprintf(L"Graphong v0.202\n");
     std::wprintf(L"\033[0;37m");
     std::wprintf(L"WASD : 이동\n");
     std::wprintf(L"QE : 고도조절\n");

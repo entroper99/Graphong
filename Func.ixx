@@ -57,7 +57,7 @@ export struct Func
                 {
                 double distA = a.x * a.x + a.z * a.z;
                 double distB = b.x * b.x + b.z * b.z;
-                return distA < distB;
+                return distA > distB;
                 });
             firstRun = false;
         }

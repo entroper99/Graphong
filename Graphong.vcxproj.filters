@@ -42,7 +42,7 @@
     <ClCompile Include="Shapes.ixx">
       <Filter>소스 파일</Filter>
     </ClCompile>
-    <ClCompile Include="..\CataCrawl\code\randomRange.ixx">
+    <ClCompile Include="randomRange.ixx">
       <Filter>소스 파일</Filter>
     </ClCompile>
   </ItemGroup>

@@ -134,7 +134,6 @@
     </Link>
   </ItemDefinitionGroup>
   <ItemGroup>
-    <ClCompile Include="..\CataCrawl\code\randomRange.ixx" />
     <ClCompile Include="constVar.ixx" />
     <ClCompile Include="cubicSpline.ixx" />
     <ClCompile Include="drawer.ixx" />
@@ -142,6 +141,7 @@
     <ClCompile Include="globalVar.ixx" />
     <ClCompile Include="main.cpp" />
     <ClCompile Include="rainbow.ixx" />
+    <ClCompile Include="randomRange.ixx" />
     <ClCompile Include="read.ixx" />
     <ClCompile Include="Shapes.ixx" />
   </ItemGroup>

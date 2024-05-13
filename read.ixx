@@ -8,12 +8,12 @@ import std;
 import Func;
 
 
-export int readXY(std::string file, int startLine, int endLine, int xCol, int yCol, SDL_Color inputCol)
+export int readXY(std::wstring file, int startLine, int endLine, int xCol, int yCol, SDL_Color inputCol)
 {
     std::ifstream in(file);
     if (in.is_open() == false)
     {
-        std::printf(file.c_str());
+        std::wprintf(file.c_str());
         std::wprintf(L" 파일을 읽는데 실패하였다.\n");
         return -1;
     }
@@ -115,7 +115,7 @@ export int readXY(std::string file, int startLine, int endLine, int xCol, int yC
     return funcSet.size()-1;
 }
 
-export int readXYZ(std::string file, int startLine, int endLine, int xCol, int yCol, int zCol, SDL_Color inputCol)
+export int readXYZ(std::wstring file, int startLine, int endLine, int xCol, int yCol, int zCol, SDL_Color inputCol)
 {
     std::ifstream in(file);
     if (in.is_open() == false) return -1;

@@ -5,6 +5,7 @@
 #include <GL/glew.h>
 #include <Eigen/Dense>
 #include <codecvt>
+#include <windows.h>
 
 import std;
 import globalVar;
@@ -14,6 +15,36 @@ import Func;
 import read;
 import rainbow;
 import cubicSpline;
+
+
+std::wstring openFileDialog() 
+{
+    WCHAR filename[MAX_PATH];
+
+    OPENFILENAME ofn;
+    ZeroMemory(&filename, sizeof(filename));
+    ZeroMemory(&ofn, sizeof(ofn));
+    ofn.lStructSize = sizeof(ofn);
+    ofn.hwndOwner = NULL; 
+    ofn.lpstrFilter = L"All Files\0*.*\0Text Files\0*.TXT\0";
+    ofn.lpstrFile = filename;
+    ofn.nMaxFile = MAX_PATH;
+    ofn.lpstrTitle = L"데이터가 있는 파일을 선택해주세요.";
+    ofn.Flags = OFN_DONTADDTORECENT | OFN_FILEMUSTEXIST;
+    if (GetOpenFileName(&ofn)) return std::wstring(filename);
+    else return L"";
+}
+
+void prtFuncName()
+{
+    for (int i = 0; i < funcSet.size(); i++)
+    {
+        std::wcout << "\033[38;2;" << static_cast<int>(funcSet[i]->myColor.r) << ";" << static_cast<int>(funcSet[i]->myColor.g) << ";" << static_cast<int>(funcSet[i]->myColor.b) << "m";
+        std::wprintf(L"[ %d번 함수 : ", i);
+        std::wprintf(funcSet[i]->funcName.c_str());
+        std::wprintf(L"] \033[0m 데이터수 : %d 개, 보간데이터 : %d 개, 컬러코드 : %d,%d,%d \n", i, funcSet[i]->myPoints.size(), funcSet[i]->myInterPoints.size(), funcSet[i]->myColor.r, funcSet[i]->myColor.g, funcSet[i]->myColor.b);
+    }
+}
 
 
 int main(int argc, char** argv)
@@ -144,28 +175,33 @@ int main(int argc, char** argv)
             std::cin >> input;
             if (input == 1)
             {
-                std::string file;
-                std::string fileInput;
-                std::wprintf(L"파일의 경로를 입력해주세요.\n");
-                std::wprintf(L"data 폴더부터 파일을 읽습니다. 예를 들어 Graphong/data/test.txt라면 터미널에 test.txt를 입력해주세요.\n");
-                std::wprintf(L"폴더의 경우 Graphong/data/folder/test.txt라면 터미널에 folder/test.txt를 입력해주세요.\n");
-                std::wprintf(L"--------------------------------------------------------------------------------------------------\n");
-                int i = 1;
-                for (const auto& entry : std::filesystem::directory_iterator("data/"))
-                {
-                    if (std::filesystem::is_regular_file(entry.status()))
-                    {
-                        std::wcout << entry.path().filename().wstring();
-                        std::wprintf(L"        ");
-                        if (i % 5 == 0) std::wprintf(L"\n");
-                        i++;
-                    }
-                }
-                std::wprintf(L"\n----------------------------------▼파일 이름을 입력해주세요▼------------------------------------\n");
-                std::cin >> fileInput;
-                file = "data/" + fileInput;
+                //openFileDialog();
+                //std::string file;
+                //std::string fileInput;
+                //std::wprintf(L"파일의 경로를 입력해주세요.\n");
+                //std::wprintf(L"data 폴더부터 파일을 읽습니다. 예를 들어 Graphong/data/test.txt라면 터미널에 test.txt를 입력해주세요.\n");
+                //std::wprintf(L"폴더의 경우 Graphong/data/folder/test.txt라면 터미널에 folder/test.txt를 입력해주세요.\n");
+                //std::wprintf(L"--------------------------------------------------------------------------------------------------\n");
+                //int i = 1;
+                //for (const auto& entry : std::filesystem::directory_iterator("data/"))
+                //{
+                //    if (std::filesystem::is_regular_file(entry.status()))
+                //    {
+                //        std::wcout << entry.path().filename().wstring();
+                //        std::wprintf(L"        ");
+                //        if (i % 5 == 0) std::wprintf(L"\n");
+                //        i++;
+                //    }
+                //}
+                //std::wprintf(L"\n----------------------------------▼파일 이름을 입력해주세요▼------------------------------------\n");
+                //std::cin >> fileInput;
+                //file = "data/" + fileInput;
 
-                std::ifstream in(file);
+                std::wstring file = L"";
+                std::wprintf(L"데이터가 있는 파일을 선택해주세요.\n");
+                file = openFileDialog();
+                std::wprintf(L"파일 %ls 를 대상으로 설정하였다.\n",file.c_str());
+                std::wifstream in(file);
                 if (in.is_open())
                 {
                     int startLine = 0;
@@ -199,28 +235,32 @@ int main(int argc, char** argv)
             }
             else if (input == 2)
             {
-                std::string file;
-                std::string fileInput;
-                std::wprintf(L"파일의 경로를 입력해주세요.\n");
-                std::wprintf(L"data 폴더부터 파일을 읽습니다. 예를 들어 Graphong/data/test.txt라면 터미널에 test.txt를 입력해주세요.\n");
-                std::wprintf(L"폴더의 경우 Graphong/data/folder/test.txt라면 터미널에 folder/test.txt를 입력해주세요.\n");
-                std::wprintf(L"--------------------------------------------------------------------------------------------------\n");
-                int i = 1;
-                for (const auto& entry : std::filesystem::directory_iterator("data/"))
-                {
-                    if (std::filesystem::is_regular_file(entry.status()))
-                    {
-                        std::wcout << entry.path().filename().wstring();
-                        std::wprintf(L"        ");
-                        if (i % 5 == 0) std::wprintf(L"\n");
-                        i++;
-                    }
-                }
-                std::wprintf(L"\n----------------------------------▼파일 이름을 입력해주세요▼------------------------------------\n");
-                std::cin >> fileInput;
-                file = "data/" + fileInput;
+                //std::wstring file;
+                //std::wstring fileInput;
+                //std::wprintf(L"파일의 경로를 입력해주세요.\n");
+                //std::wprintf(L"data 폴더부터 파일을 읽습니다. 예를 들어 Graphong/data/test.txt라면 터미널에 test.txt를 입력해주세요.\n");
+                //std::wprintf(L"폴더의 경우 Graphong/data/folder/test.txt라면 터미널에 folder/test.txt를 입력해주세요.\n");
+                //std::wprintf(L"--------------------------------------------------------------------------------------------------\n");
+                //int i = 1;
+                //for (const auto& entry : std::filesystem::directory_iterator("data/"))
+                //{
+                //    if (std::filesystem::is_regular_file(entry.status()))
+                //    {
+                //        std::wcout << entry.path().filename().wstring();
+                //        std::wprintf(L"        ");
+                //        if (i % 5 == 0) std::wprintf(L"\n");
+                //        i++;
+                //    }
+                //}
+                //std::wprintf(L"\n----------------------------------▼파일 이름을 입력해주세요▼------------------------------------\n");
+                //std::wcin >> fileInput;
+                //file = L"data/" + fileInput;
 
-                std::ifstream in(file);
+                std::wstring file = L"";
+                std::wprintf(L"데이터가 있는 파일을 선택해주세요.\n");
+                file = openFileDialog();
+                std::wprintf(L"파일 %ls 를 대상으로 설정하였다.\n", file.c_str());
+                std::wifstream in(file);
                 if (in.is_open())
                 {
                     int startLine = 0;
@@ -454,6 +494,7 @@ int main(int argc, char** argv)
             {
                 int dataIndex = 0;
                 std::wprintf(L"몇번째 데이터에 삼각분할을 실행할까? (0 ~ %d).\n", funcSet.size() - 1);
+                prtFuncName();
                 std::cin >> dataIndex;
                 funcSet[dataIndex]->triangulation();
             }
@@ -544,13 +585,7 @@ int main(int argc, char** argv)
             }
             else if (input == 22)
             {
-                for (int i = 0; i < funcSet.size(); i++)
-                {
-                    std::wcout << "\033[38;2;" << static_cast<int>(funcSet[i]->myColor.r) << ";" << static_cast<int>(funcSet[i]->myColor.g) << ";" << static_cast<int>(funcSet[i]->myColor.b) << "m";
-                    std::wprintf(L"[ ■ : ");
-                    std::printf(funcSet[i]->funcName.c_str());
-                    std::wprintf(L"] \033[0m 인덱스 : %d, 데이터수 : %d 개, 보간데이터 : %d 개, 컬러코드 : %d,%d,%d \n", i, funcSet[i]->myPoints.size(), funcSet[i]->myInterPoints.size(), funcSet[i]->myColor.r, funcSet[i]->myColor.g, funcSet[i]->myColor.b);
-                }
+                prtFuncName();
             }
             else if (input == 99)
             {
@@ -567,11 +602,11 @@ int main(int argc, char** argv)
                 std::cin >> testInput;
                 if (testInput == 1)
                 {
-                    std::string file;
+                    std::wstring file;
                     std::wprintf(L"COLVAR의 경로를 입력해주세요.\n");
-                    std::cin >> file;
+                    std::wcin >> file;
 
-                    std::ifstream in(file);
+                    std::wifstream in(file);
                     if (in.is_open())
                     {
                         int rCol, gCol, bCol;
@@ -598,11 +633,11 @@ int main(int argc, char** argv)
                 }
                 else if (testInput == 2)
                 {
-                    std::string file;
+                    std::wstring file;
                     std::wprintf(L"COLVAR의 경로를 입력해주세요.\n");
-                    std::cin >> file;
+                    std::wcin >> file;
 
-                    std::ifstream in(file);
+                    std::wifstream in(file);
                     if (in.is_open())
                     {
                         int rCol, gCol, bCol;
@@ -629,11 +664,11 @@ int main(int argc, char** argv)
                 }
                 else if (testInput == 3)
                 {
-                    std::string file;
+                    std::wstring file;
                     std::wprintf(L"파일의 경로를 입력해주세요.\n");
-                    std::cin >> file;
+                    std::wcin >> file;
 
-                    std::ifstream in(file);
+                    std::wifstream in(file);
                     if (in.is_open())
                     {
                         int rCol, gCol, bCol;
@@ -660,9 +695,9 @@ int main(int argc, char** argv)
                 }
                 else if (testInput == 4)
                 {
-                    std::string folderPath;
+                    std::wstring folderPath;
                     std::wprintf(L"fes_0.dat가 들어있는 폴더의 경로를 입력해주세요.\n");
-                    std::cin >> folderPath;
+                    std::wcin >> folderPath;
 
                     float stride = 0;
                     std::string strideAnswer;
@@ -674,7 +709,7 @@ int main(int argc, char** argv)
                         std::cin >> stride;
                     }
 
-                    if (std::filesystem::exists(folderPath + "/fes_0.dat"))
+                    if (std::filesystem::exists(folderPath + L"/fes_0.dat"))
                     {
                         int fileEndNumber = -1;
                         std::wprintf(L"fes_0.dat를 성공적으로 찾았다.\n");
@@ -682,7 +717,7 @@ int main(int argc, char** argv)
                         while (1)
                         {
                             fileEndNumber++;
-                            std::string targetPath = folderPath + "/fes_" + std::to_string(fileEndNumber) + ".dat";
+                            std::wstring targetPath = folderPath + L"/fes_" + std::to_wstring(fileEndNumber) + L".dat";
                             if (std::filesystem::exists(targetPath) == false)
                             {
                                 fileEndNumber--;
@@ -697,14 +732,14 @@ int main(int argc, char** argv)
 
                         for (int i = 0; i <= fileEndNumber; i++)
                         {
-                            std::string targetPath = folderPath + "/fes_" + std::to_string(i) + ".dat";
+                            std::wstring targetPath = folderPath + L"/fes_" + std::to_wstring(i) + L".dat";
                             if (std::filesystem::exists(targetPath))
                             {
                                 readXY(targetPath, 5, -1, 0, 1, rainbow(((float)i) / ((float)fileEndNumber)));
 
                                 if (stride != 0)
                                 {
-                                    funcSet[funcSet.size() - 1]->funcName = "FES " + std::to_string(((float)i + 1.0) * stride / 1000.0) + " ns";
+                                    funcSet[funcSet.size() - 1]->funcName = L"FES " + std::to_wstring(((float)i + 1.0) * stride / 1000.0) + L" ns";
                                 }
 
                                 if (i == 0) startIndex = funcSet.size() - 1;
@@ -752,19 +787,19 @@ int main(int argc, char** argv)
 
 
 
-                    std::string fileName;
-                    std::vector<std::string> folderList;
+                    std::wstring fileName;
+                    std::vector<std::wstring> folderList;
 
                     std::wprintf(L"파일의 이름을 입력해주세요.\n");
-                    std::cin >> fileName;
+                    std::wcin >> fileName;
 
                     const int phaseNumber = 2;
 
                     for (int i = 0; i < phaseNumber; i++)
                     {
                         std::wprintf(L"%d번 폴더의 경로를 입력해주세요.\n", i);
-                        std::string str;
-                        std::cin >> str;
+                        std::wstring str;
+                        std::wcin >> str;
                         folderList.push_back(str);
                     }
 
@@ -796,7 +831,7 @@ int main(int argc, char** argv)
                             break;
                         }
 
-                        int targetFuncIndex = readXY(folderList[i] + "/" + fileName, 6, -1, 0, 1, tgtCol);
+                        int targetFuncIndex = readXY(folderList[i] + L"/" + fileName, 6, -1, 0, 1, tgtCol);
                     }
 
                     xScale = 4;
@@ -811,9 +846,9 @@ int main(int argc, char** argv)
                 {
                     xScale = 360;
                     yScale = 1000;
-                    std::string path;
+                    std::wstring path;
                     std::wprintf(L"overlap.txt의 경로를 입력해주세요.\n");
-                    std::cin >> path;
+                    std::wcin >> path;
                     int targetIndex = readXY(path, 0, -1, 0, 1, { 255,255,0 });
                     cubicSpline(targetIndex, 6);
                     interLine = true;
@@ -1190,3 +1225,5 @@ int main(int argc, char** argv)
 
     return 0;
 }
+
+

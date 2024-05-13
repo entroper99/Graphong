@@ -9,7 +9,7 @@ import randomRange;
 
 export struct Func
 {
-    std::string funcName = "NULL";
+    std::wstring funcName = L"NULL";
     std::vector<Point> myPoints;
     std::vector<Point> myInterPoints;
     SDL_Color myColor = { 0xff,0xff,0xff };
@@ -25,11 +25,11 @@ export struct Func
     std::vector<Point> badPts;
     std::vector<Edge> edges;
     bool deleteSupertri = false;
+    bool triFirstRun = true;
 
     void singleTriangulation()
     {
-        static bool firstRun = true;
-        if (firstRun == true)
+        if (triFirstRun == true)
         {
             double totalX = 0, totalZ = 0;
             double maxX = -99999, minX = 99999, maxZ = -99999, minZ = 99999;
@@ -57,9 +57,10 @@ export struct Func
                 {
                 double distA = a.x * a.x + a.z * a.z;
                 double distB = b.x * b.x + b.z * b.z;
-                return distA > distB;
+                return distA < distB;
                 });
-            firstRun = false;
+            triFirstRun = false;
+            std::wprintf(L"슈퍼트라이앵글을 생성하였다..\n");
         }
 
         if (unselectPts.size() == 0)

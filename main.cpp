@@ -49,7 +49,7 @@ void prtFuncName()
 
 int main(int argc, char** argv)
 {
-    bool debugMode = true;
+    bool debugMode = false;
 
     std::locale::global(std::locale("korean"));
     SDL_Init(SDL_INIT_VIDEO);
@@ -67,7 +67,7 @@ int main(int argc, char** argv)
     std::wprintf(L"\033[0;37m");
     std::wprintf(L"**********************************************************\n");
     std::wprintf(L"\033[0;33m");
-    std::wprintf(L"Graphong v0.202\n");
+    std::wprintf(L"Graphong v0.300\n");
     std::wprintf(L"\033[0;37m");
     std::wprintf(L"WASD : 이동\n");
     std::wprintf(L"QE : 고도조절\n");
@@ -597,6 +597,7 @@ int main(int argc, char** argv)
                 std::wprintf(L"4.[Plumed] FES : draw FES by time \n");
                 std::wprintf(L"5.[Plumed] Sigma - Probability Density \n");
                 std::wprintf(L"6.[Plumed] Sigma - Overlap \n");
+                std::wprintf(L"7.Fick's second law 편미분 방정식 계산 \n");
                 std::wprintf(L"------------------▼아래에 값 입력-----------------\n");
                 int testInput = 0;
                 std::cin >> testInput;
@@ -871,6 +872,104 @@ int main(int argc, char** argv)
 
                     xAxisName = "SIGMA";
                     yAxisName = "Overlap";
+                }
+                else if (testInput == 7)
+                {
+                    std::wprintf(L"Fick's 2nd Law : ∂C/∂t = (∂/∂x)(D(C)∂C/∂x)\n");
+
+                    auto doubleInput = [](std::wstring str)->double
+                        {
+                            std::wprintf(str.c_str());
+                            std::wprintf(L"\n");
+                            double rtn;
+                            std::cin >> rtn;
+                            return rtn;
+                        };
+
+                    auto intInput = [](std::wstring str)->int
+                        {
+                            std::wprintf(str.c_str());
+                            double rtn;
+                            std::cin >> rtn;
+                            return rtn;
+                        };
+
+                    double delX = doubleInput(L"[1] 거리 간격 Δx 입력\n");
+                    double delT = doubleInput(L"[2] 시간 간격 Δt 입력\n");
+                    int xNum = intInput(L"[4-1] 거리 시행 횟수 입력\n");
+                    int tNum = intInput(L"[4-2] 시간 시행 횟수 입력\n");
+                    double initConc = doubleInput(L"[3-1] 시간 초기조건 입력 C(x,t=0)\n");
+                    double startDistBC = doubleInput(L"[3-2] 거리 0 경계조건 입력 C(x=0,t)\n");
+                    double infDistBC = doubleInput(L"[3-3] 거리 ∞ 경계조건 입력 C(x=∞,t)\n");
+
+
+
+                    std::wprintf(L"확산계수 D(C) 식의 형태를 입력해주세요.\n");
+                    std::wprintf(L"1. Constant\n");
+                    std::wprintf(L"2. Polynomial\n");
+                    std::wprintf(L"3. Exponential(미구현)\n");
+                    std::wprintf(L"4. Logarithm(미구현)\n");
+                    int diffType;
+                    std::cin >> diffType;
+                    
+
+                    if (diffType == 1)
+                    {
+                        std::wprintf(L"확산계수(상수)의 값을 몇으로 할까?\n");
+                        double diffVal;
+                        std::cin >> diffVal;
+
+
+                        diffVal = 1.0;
+                        delX = 0.1;
+                        delT = 0.0005;
+                        xNum = 100;
+                        tNum = 100;
+                        initConc = 1.0;
+                        startDistBC = 0; //한계전류 조건
+                        infDistBC = initConc;
+
+
+                        std::vector<std::vector<double>> conc;
+                        std::vector<double> initConcVec;
+                        //초기화
+                        for (int i = 0; i < xNum; i++) initConcVec.push_back(initConc);
+                        conc.push_back(initConcVec);
+
+                        //편미분 방정식 계산
+                        {
+                            for (int t = 0; t < tNum - 1; t++)
+                            {
+                                std::vector<double> concNew(xNum, 0.0);
+                                for (int n = 0; n < tNum; ++n)
+                                {
+                                    for (int i = 1; i < xNum - 1; ++i)
+                                    {
+                                        concNew[i] = conc[t][i] + diffVal * delT / (delX * delX) * (conc[t][i + 1] - 2 * conc[t][i] + conc[t][i - 1]);
+                                    }
+                                    concNew[0] = startDistBC;
+                                    concNew[tNum - 1] = infDistBC; 
+                                }
+                                conc.push_back(concNew);
+                            }
+                        }
+
+                        Func* targetFunc = new Func();
+                        funcSet.push_back(targetFunc);
+
+                        for (int t = 0; t < tNum; t++)
+                        {
+                            for (int x = 0; x < xNum; x++)
+                            {
+                                Point pt;
+                                pt.z = t * delT; //청색 시간
+                                pt.x = x * delX; //적색 거리
+                                pt.y = conc[t][x];
+                                targetFunc->myPoints.push_back(pt);
+                                std::wprintf(L"데이터 {%f,%f,%f}를 함수 %d에 입력했다.\n", pt.x, pt.y, pt.z, funcSet.size() - 1);
+                            }
+                        }
+                    }
                 }
             }
             else std::wprintf(L"잘못된 값이 입력되었다.\n");

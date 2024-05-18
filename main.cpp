@@ -894,82 +894,176 @@ int main(int argc, char** argv)
                             return rtn;
                         };
 
-                    double delX = doubleInput(L"[1] 거리 간격 Δx 입력\n");
-                    double delT = doubleInput(L"[2] 시간 간격 Δt 입력\n");
-                    int xNum = intInput(L"[4-1] 거리 시행 횟수 입력\n");
-                    int tNum = intInput(L"[4-2] 시간 시행 횟수 입력\n");
-                    double initConc = doubleInput(L"[3-1] 시간 초기조건 입력 C(x,t=0)\n");
-                    double startDistBC = doubleInput(L"[3-2] 거리 0 경계조건 입력 C(x=0,t)\n");
-                    double infDistBC = doubleInput(L"[3-3] 거리 ∞ 경계조건 입력 C(x=∞,t)\n");
+                    double delX, delT, initConc, startDistBC, infDistBC;
+                    int xNum, tNum;
 
+                    //double delX = doubleInput(L"[1] 거리 간격 Δx 입력\n");
+                    //double delT = doubleInput(L"[2] 시간 간격 Δt 입력\n");
+                    //int xNum = intInput(L"[4-1] 거리 시행 횟수 입력\n");
+                    //int tNum = intInput(L"[4-2] 시간 시행 횟수 입력\n");
+                    //double initConc = doubleInput(L"[3-1] 시간 초기조건 입력 C(x,t=0)\n");
+                    //double startDistBC = doubleInput(L"[3-2] 거리 0 경계조건 입력 C(x=0,t)\n");
+                    //double infDistBC = doubleInput(L"[3-3] 거리 ∞ 경계조건 입력 C(x=∞,t)\n");
+
+                    std::function<double(double)> diffFunc; //농도에 따라 변화하는 확산계수 D(C)
 
 
                     std::wprintf(L"확산계수 D(C) 식의 형태를 입력해주세요.\n");
                     std::wprintf(L"1. Constant\n");
                     std::wprintf(L"2. Polynomial\n");
-                    std::wprintf(L"3. Exponential(미구현)\n");
-                    std::wprintf(L"4. Logarithm(미구현)\n");
+                    std::wprintf(L"3. Exponential\n");
+                    std::wprintf(L"4. Logarithm\n");
                     int diffType;
                     std::cin >> diffType;
-                    
+
 
                     if (diffType == 1)
                     {
-                        std::wprintf(L"확산계수(상수)의 값을 몇으로 할까?\n");
+                        std::wprintf(L"D(C) = const\n");
+                        std::wprintf(L"확산계수(const) 입력\n");
                         double diffVal;
                         std::cin >> diffVal;
 
+                        diffFunc = [=](double inputConc) -> double
+                            {
+                                return diffVal;
+                            };
+                    }
+                    else if (diffType == 2)
+                    {
+                        std::wprintf(L"D(C) = D0(1+γC)\n");
+                        std::wprintf(L"확산계수의 초기값 D0 입력\n");
+                        double diff0;
+                        std::cin >> diff0;
+                        std::wprintf(L"농도에 따른 증감배율 γ 입력\n");
+                        double diffGamma;
+                        std::cin >> diffGamma;
 
-                        diffVal = 1.0;
-                        delX = 0.1;
-                        delT = 0.0005;
-                        xNum = 100;
-                        tNum = 100;
-                        initConc = 1.0;
-                        startDistBC = 0; //한계전류 조건
-                        infDistBC = initConc;
+                        diffFunc = [=](double inputConc) -> double
+                            {
+                                return diff0 * (1+diffGamma* inputConc);
+                            };
+                    }
+                    else if (diffType == 3)
+                    {
+                        std::wprintf(L"D(C) = D0*exp(γC)\n");
+                        std::wprintf(L"확산계수의 초기값 D0 입력\n");
+                        double diff0;
+                        std::cin >> diff0;
+                        std::wprintf(L"농도에 따른 증감배율 γ 입력\n");
+                        double diffGamma;
+                        std::cin >> diffGamma;
 
+                        diffFunc = [=](double inputConc) -> double
+                            {
+                                return diff0 * std::exp(diffGamma * inputConc);
+                            };
+                    }
+                    else if (diffType == 4)
+                    {
+                        std::wprintf(L"D(C) = D0*ln(1+γC)\n");
+                        std::wprintf(L"확산계수의 초기값 D0 입력\n");
+                        double diff0;
+                        std::cin >> diff0;
+                        std::wprintf(L"농도에 따른 증감배율 γ 입력\n");
+                        double diffGamma;
+                        std::cin >> diffGamma;
 
-                        std::vector<std::vector<double>> conc;
-                        std::vector<double> initConcVec;
-                        //초기화
-                        for (int i = 0; i < xNum; i++) initConcVec.push_back(initConc);
-                        conc.push_back(initConcVec);
+                        diffFunc = [=](double inputConc) -> double
+                            {
+                                return diff0 * std::log(1 + diffGamma * inputConc);
+                            };
+                    }
 
-                        //편미분 방정식 계산
+                    delX = 0.1;
+                    delT = 0.0005;
+                    xNum = 100;
+                    tNum = 400;
+                    initConc = 1.0;
+                    startDistBC = 0; //한계전류 조건
+                    infDistBC = initConc;
+
+                    std::vector<std::vector<double>> conc;
+                    std::vector<double> initConcVec;
+                    //초기화
+                    for (int i = 0; i < xNum; i++) initConcVec.push_back(initConc);
+                    conc.push_back(initConcVec);
+
+                    //편미분 방정식 계산
+                    {
+                        for (int t = 0; t < tNum - 1; t++)
+                        {
+                            std::vector<double> concNew(xNum, 0.0);
+                            for (int n = 0; n < tNum; ++n)
+                            {
+                                for (int i = 1; i < xNum - 1; ++i)
+                                {
+                                    double diff_halfBefore = diffFunc((conc[t][i] + conc[t][i + 1]) / 2.0);
+                                    double diff_halfAfter = diffFunc((conc[t][i] + conc[t][i - 1]) / 2.0);
+                                    concNew[i] = conc[t][i] + delT / (delX * delX) * (diff_halfBefore * (conc[t][i + 1] - conc[t][i]) - diff_halfAfter * (conc[t][i] - conc[t][i - 1]));
+                                }
+                                concNew[0] = startDistBC;
+                                concNew[xNum - 1] = infDistBC;
+                            }
+                            conc.push_back(concNew);
+                        }
+                    }
+
+                    Func* targetFunc = new Func();
+                    funcSet.push_back(targetFunc);
+                    int rCol, gCol, bCol;
+                    std::wprintf(L"이 데이터의 R값을 뭐로 할까?(~255)\n");
+                    std::cin >> rCol;
+                    std::wprintf(L"이 데이터의 G값을 뭐로 할까?(~255)\n");
+                    std::cin >> gCol;
+                    std::wprintf(L"이 데이터의 B값을 뭐로 할까?(~255)\n");
+                    std::cin >> bCol;
+                    targetFunc->myColor = { (Uint8)rCol,(Uint8)gCol,(Uint8)bCol };
+                    for (int t = 0; t < tNum; t++)
+                    {
+                        for (int x = 0; x < xNum; x++)
+                        {
+                            Point pt;
+                            pt.z = t * delT; //청색 시간
+                            pt.x = x * delX; //적색 거리
+                            pt.y = conc[t][x];
+                            targetFunc->myPoints.push_back(pt);
+                            //std::wprintf(L"데이터 {%f,%f,%f}를 함수 %d에 입력했다.\n", pt.x, pt.y, pt.z, funcSet.size() - 1);
+                        }
+                    }
+
+                    std::wstring yn;
+                    std::wprintf(L"(∂C/∂x)|z=0으로 전류 그래프 i(t)를 그리시겠습니까? [y/n]");
+                    std::wcin >> yn;
+
+                    if (yn == L"y")
+                    {
+                        Func* targetFunc2 = new Func();
+                        int rCol, gCol, bCol;
+                        std::wprintf(L"표면전류 데이터의 R값을 뭐로 할까?(~255)\n");
+                        std::cin >> rCol;
+                        std::wprintf(L"표먼전류 데이터의 G값을 뭐로 할까?(~255)\n");
+                        std::cin >> gCol;
+                        std::wprintf(L"표면전류 데이터의 B값을 뭐로 할까?(~255)\n");
+                        std::cin >> bCol;
+                        targetFunc2->myColor = { (Uint8)rCol,(Uint8)gCol,(Uint8)bCol };
+                        funcSet.push_back(targetFunc2);
+                        std::vector<double> diffData;
+                        //편미분 전류 그래프 생성
                         {
                             for (int t = 0; t < tNum - 1; t++)
                             {
-                                std::vector<double> concNew(xNum, 0.0);
-                                for (int n = 0; n < tNum; ++n)
-                                {
-                                    for (int i = 1; i < xNum - 1; ++i)
-                                    {
-                                        concNew[i] = conc[t][i] + diffVal * delT / (delX * delX) * (conc[t][i + 1] - 2 * conc[t][i] + conc[t][i - 1]);
-                                    }
-                                    concNew[0] = startDistBC;
-                                    concNew[tNum - 1] = infDistBC; 
-                                }
-                                conc.push_back(concNew);
-                            }
-                        }
-
-                        Func* targetFunc = new Func();
-                        funcSet.push_back(targetFunc);
-
-                        for (int t = 0; t < tNum; t++)
-                        {
-                            for (int x = 0; x < xNum; x++)
-                            {
-                                Point pt;
-                                pt.z = t * delT; //청색 시간
-                                pt.x = x * delX; //적색 거리
-                                pt.y = conc[t][x];
-                                targetFunc->myPoints.push_back(pt);
-                                std::wprintf(L"데이터 {%f,%f,%f}를 함수 %d에 입력했다.\n", pt.x, pt.y, pt.z, funcSet.size() - 1);
+                                double diffConc = (conc[t][2] - conc[t][0]) / (2 * delX);
+                                diffData.push_back(diffConc);
+                                targetFunc2->myPoints.push_back({ 0, diffConc, t * delT });
                             }
                         }
                     }
+                    else
+                    {
+                    }
+                    std::wprintf(L"모든 계산이 완료되었다.\n");
+
                 }
             }
             else std::wprintf(L"잘못된 값이 입력되었다.\n");
@@ -1140,7 +1234,7 @@ int main(int argc, char** argv)
         float zeroX = 1, zeroY = 1, zeroZ = 1;
         if (camFixZ || camFixMinusZ) zeroZ = 0;
         if (camFixY || camFixMinusY) zeroY = 0;
-        if (camFixZ || camFixMinusZ) zeroX = 0;
+        if (camFixX || camFixMinusX) zeroX = 0;
 
         if (visDataPoint)
         {

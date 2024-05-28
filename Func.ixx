@@ -247,6 +247,52 @@ export struct Func
             singleTriangulation();
         }
     };
+
+    void sym() 
+    {
+        //중심점 계산
+        double totalX = 0, totalY = 0, totalZ = 0;
+        for (const auto& point : myPoints) 
+        {
+            totalX += point.x;
+            totalY += point.y;
+            totalZ += point.z;
+        }
+        double centerX = totalX / myPoints.size();
+        double centerY = totalY / myPoints.size();
+        double centerZ = totalZ / myPoints.size();
+
+        double rcs = 1.0; // 가중치 함수의 스무스 컷오프 파라미터
+        double rc = 10.0;  // 컷오프 거리
+
+        std::vector<Point> newPoints;
+        for (const auto& point : myPoints)
+        {
+            //중심점으로부터의 상대거리
+            double xji = point.x - centerX;
+            double yji = point.y - centerY;
+            double zji = point.z - centerZ;
+            double rji = std::sqrt(xji * xji + yji * yji + zji * zji);
+
+            // 가중치 함수 계산
+            double s_rji;
+            if (rji < rcs)  s_rji = 1.0 / rji;
+            else if (rji < rc) s_rji = 1.0 / rji * (0.5 * cos(M_PI * (rji - rcs) / (rc - rcs)) + 0.5);
+            else  s_rji = 0.0;
+
+            // 대칭 변환된 좌표 계산 (일단은 중심점과의 상대거리로 계산하였음)
+            double newX =/* centerX + */s_rji * xji;
+            double newY = /*centerY + */s_rji * yji;
+            double newZ = /*centerZ + */s_rji * zji;
+
+            newPoints.push_back({ newX, newY, newZ });
+        }
+
+        myPoints = newPoints;
+
+        std::wprintf(L"표준화를 완료하였다.\n");
+    }
+
 };
 
 

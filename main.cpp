@@ -15,6 +15,7 @@ import Func;
 import read;
 import rainbow;
 import cubicSpline;
+import inputCol;
 
 
 std::wstring openFileDialog() 
@@ -161,6 +162,10 @@ int main(int argc, char** argv)
             std::wprintf(L"20.데이터 점 크기 조절\n");
             std::wprintf(L"21.그래프 이름 변경\n");
             std::wprintf(L"22.함수 목록 출력\n");
+            std::wprintf(L"23.자이로이드 구조 생성\n");
+            std::wprintf(L"24.함수값 출력\n");
+            std::wprintf(L"25.중심점에 대해 함수 표준화\n");
+            std::wprintf(L"26.PDE Solver\n");
             //std::wprintf(L"\033[37m");
             //std::wprintf(L"101.[Plumed] COLVAR : draw time-# Graph \n");
             //std::wprintf(L"102.[Plumed] COLVAR : draw time-biasPot Graph \n");
@@ -220,16 +225,8 @@ int main(int argc, char** argv)
                     std::wprintf(L"y값이 있는 열을 입력해주세요.(0부터 시작)\n");
                     std::cin >> yCol;
 
-
-                    int rCol, gCol, bCol;
-                    std::wprintf(L"이 데이터의 R값을 뭐로 할까?(~255)\n");
-                    std::cin >> rCol;
-                    std::wprintf(L"이 데이터의 G값을 뭐로 할까?(~255)\n");
-                    std::cin >> gCol;
-                    std::wprintf(L"이 데이터의 B값을 뭐로 할까?(~255)\n");
-                    std::cin >> bCol;
-
-                    readXY(file, startLine, endLine, xCol, yCol, { (Uint8)rCol,(Uint8)gCol,(Uint8)bCol });
+                    SDL_Color col = inputCol();
+                    readXY(file, startLine, endLine, xCol, yCol, col);
                 }
                 else std::wprintf(L"파일을 읽는데 실패하였습니다.\n");
             }
@@ -283,15 +280,8 @@ int main(int argc, char** argv)
                     std::wprintf(L"(Output) y값이 있는 열을 입력해주세요.(0부터 시작)\n");
                     std::cin >> yCol;
 
-                    int rCol, gCol, bCol;
-                    std::wprintf(L"이 데이터의 R값을 뭐로 할까?(~255)\n");
-                    std::cin >> rCol;
-                    std::wprintf(L"이 데이터의 G값을 뭐로 할까?(~255)\n");
-                    std::cin >> gCol;
-                    std::wprintf(L"이 데이터의 B값을 뭐로 할까?(~255)\n");
-                    std::cin >> bCol;
-
-                    readXYZ(file, startLine, endLine, xCol, yCol, zCol, { (Uint8)rCol,(Uint8)gCol,(Uint8)bCol });
+                    SDL_Color col = inputCol();
+                    readXYZ(file, startLine, endLine, xCol, yCol, zCol, col);
                 }
                 else std::wprintf(L"파일을 읽는데 실패하였습니다.\n");
             }
@@ -587,488 +577,274 @@ int main(int argc, char** argv)
             {
                 prtFuncName();
             }
-            else if (input == 99)
+            else if (input == 23) //자이로이드 생성
             {
-                std::wprintf(L"----------------------------------------------------\n");
-                std::wprintf(L"테스트용 기능 \n");
-                std::wprintf(L"1.[Plumed] COLVAR : draw time-# Graph \n");
-                std::wprintf(L"2.[Plumed] COLVAR : draw time-biasPot Graph \n");
-                std::wprintf(L"3.[Plumed] FES : draw FES result \n");
-                std::wprintf(L"4.[Plumed] FES : draw FES by time \n");
-                std::wprintf(L"5.[Plumed] Sigma - Probability Density \n");
-                std::wprintf(L"6.[Plumed] Sigma - Overlap \n");
-                std::wprintf(L"7.Fick's second law 편미분 방정식 계산 \n");
-                std::wprintf(L"------------------▼아래에 값 입력-----------------\n");
-                int testInput = 0;
-                std::cin >> testInput;
-                if (testInput == 1)
+                Func* targetFunc = new Func();
+                funcSet.push_back(targetFunc);
+
+
+                int numPoints = 40; // 공간에 존재하는 점의 수, 많을수록 정확해짐
+                double spacing = (2.0 * M_PI) / numPoints; //사이의 공간, 전부 더하면 부피가 됨
+
+                double cutoff = 1.0; //이 값 이상의 자이로이드만 화면에 표시됨
+
+                for (int i = -numPoints/2; i < numPoints/2; ++i)
                 {
-                    std::wstring file;
-                    std::wprintf(L"COLVAR의 경로를 입력해주세요.\n");
-                    std::wcin >> file;
-
-                    std::wifstream in(file);
-                    if (in.is_open())
+                    for (int j = -numPoints/2; j < numPoints/2; ++j)
                     {
-                        int rCol, gCol, bCol;
-                        std::wprintf(L"이 데이터의 R값을 뭐로 할까?(~255)\n");
-                        std::cin >> rCol;
-                        std::wprintf(L"이 데이터의 G값을 뭐로 할까?(~255)\n");
-                        std::cin >> gCol;
-                        std::wprintf(L"이 데이터의 B값을 뭐로 할까?(~255)\n");
-                        std::cin >> bCol;
-
-                        readXY(file, 1, -1, 0, 2, { (Uint8)rCol,(Uint8)gCol,(Uint8)bCol });
-
-                        graphName = L"time-number graph";
-
-                        xAxisName = "Time";
-                        yAxisName = "Number_of_atoms";
-
-                        xScaleUnit = L"ps";
-
-                        xScale = 0.002;
-                        yScale = 0.02;
-                    }
-                    else std::wprintf(L"COLVAR를 읽는데 실패하였습니다.\n");
-                }
-                else if (testInput == 2)
-                {
-                    std::wstring file;
-                    std::wprintf(L"COLVAR의 경로를 입력해주세요.\n");
-                    std::wcin >> file;
-
-                    std::wifstream in(file);
-                    if (in.is_open())
-                    {
-                        int rCol, gCol, bCol;
-                        std::wprintf(L"이 데이터의 R값을 뭐로 할까?(~255)\n");
-                        std::cin >> rCol;
-                        std::wprintf(L"이 데이터의 G값을 뭐로 할까?(~255)\n");
-                        std::cin >> gCol;
-                        std::wprintf(L"이 데이터의 B값을 뭐로 할까?(~255)\n");
-                        std::cin >> bCol;
-
-                        readXY(file, 1, -1, 0, 3, { (Uint8)rCol,(Uint8)gCol,(Uint8)bCol });
-
-                        graphName = L"time-biasPot graph";
-
-                        xAxisName = "Time";
-                        yAxisName = "BiasPotential";
-
-                        xScaleUnit = L"ps";
-
-                        xScale = 0.001;
-                        yScale = 0.002;
-                    }
-                    else std::wprintf(L"COLVAR를 읽는데 실패하였습니다.\n");
-                }
-                else if (testInput == 3)
-                {
-                    std::wstring file;
-                    std::wprintf(L"파일의 경로를 입력해주세요.\n");
-                    std::wcin >> file;
-
-                    std::wifstream in(file);
-                    if (in.is_open())
-                    {
-                        int rCol, gCol, bCol;
-                        std::wprintf(L"이 데이터의 R값을 뭐로 할까?(~255)\n");
-                        std::cin >> rCol;
-                        std::wprintf(L"이 데이터의 G값을 뭐로 할까?(~255)\n");
-                        std::cin >> gCol;
-                        std::wprintf(L"이 데이터의 B값을 뭐로 할까?(~255)\n");
-                        std::cin >> bCol;
-
-                        readXY(file, 5, -1, 0, 1, { (Uint8)rCol,(Uint8)gCol,(Uint8)bCol });
-
-                        graphName = L"FES Result";
-
-                        xAxisName = "CollectiveVariable";
-                        yAxisName = "FreeEnergy";
-
-                        yScaleUnit = L"kJ/mol";
-
-                        xScale = 0.05;
-                        yScale = 0.004;
-                    }
-                    else std::wprintf(L"파일을 읽는데 실패하였습니다.\n");
-                }
-                else if (testInput == 4)
-                {
-                    std::wstring folderPath;
-                    std::wprintf(L"fes_0.dat가 들어있는 폴더의 경로를 입력해주세요.\n");
-                    std::wcin >> folderPath;
-
-                    float stride = 0;
-                    std::string strideAnswer;
-                    std::wprintf(L"STRIDE의 값을 입력하시겠습니까?[y/n]\n");
-                    std::cin >> strideAnswer;
-                    if (strideAnswer == "y")
-                    {
-                        std::wprintf(L"STRIDE의 값을 입력해주세요.\n");
-                        std::cin >> stride;
-                    }
-
-                    if (std::filesystem::exists(folderPath + L"/fes_0.dat"))
-                    {
-                        int fileEndNumber = -1;
-                        std::wprintf(L"fes_0.dat를 성공적으로 찾았다.\n");
-
-                        while (1)
+                        for (int k = -numPoints/2; k < numPoints/2; ++k)
                         {
-                            fileEndNumber++;
-                            std::wstring targetPath = folderPath + L"/fes_" + std::to_wstring(fileEndNumber) + L".dat";
-                            if (std::filesystem::exists(targetPath) == false)
-                            {
-                                fileEndNumber--;
-                                std::wprintf(L"현재 이 폴더에 0부터 %d까지의 FES 데이터가 존재한다.\n", fileEndNumber);
-                                break;
-                            }
-                        }
-
-
-                        int startIndex = -1;
-                        int endIndex = -1;
-
-                        for (int i = 0; i <= fileEndNumber; i++)
-                        {
-                            std::wstring targetPath = folderPath + L"/fes_" + std::to_wstring(i) + L".dat";
-                            if (std::filesystem::exists(targetPath))
-                            {
-                                readXY(targetPath, 5, -1, 0, 1, rainbow(((float)i) / ((float)fileEndNumber)));
-
-                                if (stride != 0)
-                                {
-                                    funcSet[funcSet.size() - 1]->funcName = L"FES " + std::to_wstring(((float)i + 1.0) * stride / 1000.0) + L" ns";
-                                }
-
-                                if (i == 0) startIndex = funcSet.size() - 1;
-                                else if (i == fileEndNumber) endIndex = funcSet.size() - 1;
-                            }
-
-                        }
-
-                        std::string answer;
-                        std::wprintf(L"모든 함수들에 대해 스플라인 보간을 실행할까?[y/n].\n");
-                        std::cin >> answer;
-
-                        if (answer == "y")
-                        {
-                            int newPointNum = 1;
-                            std::wprintf(L"두 표본점 사이에 들어갈 보간점의 개수를 입력해주세요.\n");
-                            std::cin >> newPointNum;
-
-                            for (int i = startIndex; i <= endIndex; i++)
-                            {
-                                cubicSpline(i, newPointNum);
-                            }
-                            visInterPoint = false;
-                        }
-                        interLine = true;
-
-                        graphName = L"FES by time";
-
-                        xAxisName = "CollectiveVariable";
-                        yAxisName = "FreeEnergy";
-
-                        yScaleUnit = L"kJ/mol";
-
-                        xScale = 0.05;
-                        yScale = 0.004;
-                    }
-                    else
-                    {
-                        std::wprintf(L"파일 읽기가 실패하였습니다. 해당 경로에 fes_0.dat 파일이 없습니다..\n");
-                    }
-                }
-                else if (testInput == 5)
-                {
-                    //funcSet.clear();
-
-
-
-                    std::wstring fileName;
-                    std::vector<std::wstring> folderList;
-
-                    std::wprintf(L"파일의 이름을 입력해주세요.\n");
-                    std::wcin >> fileName;
-
-                    const int phaseNumber = 2;
-
-                    for (int i = 0; i < phaseNumber; i++)
-                    {
-                        std::wprintf(L"%d번 폴더의 경로를 입력해주세요.\n", i);
-                        std::wstring str;
-                        std::wcin >> str;
-                        folderList.push_back(str);
-                    }
-
-                    for (int i = 0; i < folderList.size(); i++)
-                    {
-                        SDL_Color tgtCol = col::white;
-                        switch (i % 7)
-                        {
-                        case 0:
-                            tgtCol = col::yellow;
-                            break;
-                        case 1:
-                            tgtCol = col::skyBlue;
-                            break;
-                        case 2:
-                            tgtCol = col::monaLisa;
-                            break;
-                        case 3:
-                            tgtCol = col::blueberry;
-                            break;
-                        case 4:
-                            tgtCol = col::bondiBlue;
-                            break;
-                        case 5:
-                            tgtCol = col::yellowGreen;
-                            break;
-                        case 6:
-                            tgtCol = col::orange;
-                            break;
-                        }
-
-                        int targetFuncIndex = readXY(folderList[i] + L"/" + fileName, 6, -1, 0, 1, tgtCol);
-                    }
-
-                    xScale = 4;
-                    yScale = 0.5;
-
-                    graphName = std::wstring(fileName.begin(), fileName.end());
-
-                    xAxisName = "k(χ)";
-                    yAxisName = "ProbabilityDensity";
-                }
-                else if (testInput == 6)
-                {
-                    xScale = 360;
-                    yScale = 1000;
-                    std::wstring path;
-                    std::wprintf(L"overlap.txt의 경로를 입력해주세요.\n");
-                    std::wcin >> path;
-                    int targetIndex = readXY(path, 0, -1, 0, 1, { 255,255,0 });
-                    cubicSpline(targetIndex, 6);
-                    interLine = true;
-                    visDataPoint = true;
-                    visInterPoint = false;
-
-                    float min = 999999.0;
-                    int minIndex = -1;
-                    for (int i = 0; i < funcSet[targetIndex]->myInterPoints.size(); i++)
-                    {
-                        if (funcSet[targetIndex]->myInterPoints[i].y < min)
-                        {
-                            min = funcSet[targetIndex]->myInterPoints[i].y;
-                            minIndex = i;
+                            double x = i * spacing;
+                            double y = j * spacing;
+                            double z = k * spacing;
+                            double value = std::sqrt(8.0 / 3.0) * (std::cos(x - M_PI) * std::sin(y - M_PI) * std::sin(2 * (z - M_PI)) + std::cos(y - M_PI) * std::sin(z - M_PI) * std::sin(2 * (x - M_PI)) + std::cos(z - M_PI) * std::sin(x - M_PI) * std::sin(2 * (y - M_PI)));
+                            if (value >= cutoff) targetFunc->myPoints.push_back({ x, y, z });
+                            //std::wprintf(L"데이터 {%f,%f,%f}를 함수 %d에 입력했다.\n", x, y, z, funcSet.size() - 1);
                         }
                     }
-                    std::wprintf(L"\033[0;33m");
-                    std::wprintf(L"overlap의 최저값은 (%f,%f)이다. 따라서 적절한 σ = %f\n", funcSet[targetIndex]->myInterPoints[minIndex].x, funcSet[targetIndex]->myInterPoints[minIndex].y, funcSet[targetIndex]->myInterPoints[minIndex].x);
-                    std::wprintf(L"\033[0m");
-
-                    xAxisName = "SIGMA";
-                    yAxisName = "Overlap";
                 }
-                else if (testInput == 7)
-                {
-                    std::wprintf(L"Fick's 2nd Law : ∂C/∂t = (∂/∂x)(D(C)∂C/∂x)\n");
 
-                    auto doubleInput = [](std::wstring str)->double
+
+                /*int numPoints = 40; 
+                double spacing = 0.5;*/
+
+                //int numPoints = 40; // 공간에 존재하는 점의 수, 많을수록 정확해짐
+                //double spacing = (2.0 * M_PI) / numPoints; //사이의 공간, 전부 더하면 부피가 됨
+                //
+                //double cutoff = 1.0; //이 값 이상의 자이로이드만 화면에 표시됨
+
+                //for (int i = numPoints; i < numPoints; ++i) 
+                //{
+                //    for (int j = 0; j < numPoints; ++j) 
+                //    {
+                //        for (int k = 0; k < numPoints; ++k) 
+                //        {
+                //            double x = i * spacing;
+                //            double y = j * spacing;
+                //            double z = k * spacing;
+                //            double value = std::sqrt(8.0 / 3.0) * (std::cos(x) * std::sin(y) * std::sin(2 * z) + std::cos(y) * std::sin(z) * std::sin(2 * x) + std::cos(z) * std::sin(x) * std::sin(2 * y));
+                //            if (value >= cutoff) targetFunc->myPoints.push_back({ x, y, z });
+                //            //std::wprintf(L"데이터 {%f,%f,%f}를 함수 %d에 입력했다.\n", x, y, z, funcSet.size() - 1);
+                //        }
+                //    }
+                //}
+            }
+            else if (input == 24)
+            {
+                int dataIndex = 0;
+                std::wprintf(L"몇번째 데이터의 포인트를 출력할까? (0 ~ %d).\n", funcSet.size() - 1);
+                prtFuncName();
+                std::cin >> dataIndex;
+                for (int i = 0; i < funcSet[dataIndex]->myPoints.size(); i++)
+                {
+                    Point pt = funcSet[dataIndex]->myPoints[i];
+                    std::wprintf(L"Index %d : {%.10f,%.10f,%.10f}\n", i, pt.x, pt.y, pt.z);
+                }
+            }
+            else if (input == 25) //데이터 표준화
+            {
+                int dataIndex = 0;
+                std::wprintf(L"몇번째 데이터를 대칭 구조로 만들까? (0 ~ %d).\n", funcSet.size() - 1);
+                prtFuncName();
+                std::cin >> dataIndex;
+                funcSet[dataIndex]->sym();
+            }
+            else if (input == 26)
+            {
+                std::wprintf(L"Fick's 2nd Law : ∂C/∂t = (∂/∂x)(D(C)∂C/∂x)\n");
+
+                auto doubleInput = [](std::wstring str)->double
+                    {
+                        std::wprintf(str.c_str());
+                        std::wprintf(L"\n");
+                        double rtn;
+                        std::cin >> rtn;
+                        return rtn;
+                    };
+
+                auto intInput = [](std::wstring str)->int
+                    {
+                        std::wprintf(str.c_str());
+                        double rtn;
+                        std::cin >> rtn;
+                        return rtn;
+                    };
+
+                double delX, delT, initConc, startDistBC, infDistBC;
+                int xNum, tNum;
+
+                //double delX = doubleInput(L"[1] 거리 간격 Δx 입력\n");
+                //double delT = doubleInput(L"[2] 시간 간격 Δt 입력\n");
+                //int xNum = intInput(L"[4-1] 거리 시행 횟수 입력\n");
+                //int tNum = intInput(L"[4-2] 시간 시행 횟수 입력\n");
+                //double initConc = doubleInput(L"[3-1] 시간 초기조건 입력 C(x,t=0)\n");
+                //double startDistBC = doubleInput(L"[3-2] 거리 0 경계조건 입력 C(x=0,t)\n");
+                //double infDistBC = doubleInput(L"[3-3] 거리 ∞ 경계조건 입력 C(x=∞,t)\n");
+
+                std::function<double(double)> diffFunc; //농도에 따라 변화하는 확산계수 D(C)
+
+
+                std::wprintf(L"확산계수 D(C) 식의 형태를 입력해주세요.\n");
+                std::wprintf(L"1. Constant\n");
+                std::wprintf(L"2. Polynomial\n");
+                std::wprintf(L"3. Exponential\n");
+                std::wprintf(L"4. Logarithm\n");
+                int diffType;
+                std::cin >> diffType;
+
+
+                if (diffType == 1)
+                {
+                    std::wprintf(L"D(C) = const\n");
+                    std::wprintf(L"확산계수(const) 입력\n");
+                    double diffVal;
+                    std::cin >> diffVal;
+
+                    diffFunc = [=](double inputConc) -> double
                         {
-                            std::wprintf(str.c_str());
-                            std::wprintf(L"\n");
-                            double rtn;
-                            std::cin >> rtn;
-                            return rtn;
+                            return diffVal;
                         };
+                }
+                else if (diffType == 2)
+                {
+                    std::wprintf(L"D(C) = D0(1+γC)\n");
+                    std::wprintf(L"확산계수의 초기값 D0 입력\n");
+                    double diff0;
+                    std::cin >> diff0;
+                    std::wprintf(L"농도에 따른 증감배율 γ 입력\n");
+                    double diffGamma;
+                    std::cin >> diffGamma;
 
-                    auto intInput = [](std::wstring str)->int
+                    diffFunc = [=](double inputConc) -> double
                         {
-                            std::wprintf(str.c_str());
-                            double rtn;
-                            std::cin >> rtn;
-                            return rtn;
+                            return diff0 * (1 + diffGamma * inputConc);
                         };
+                }
+                else if (diffType == 3)
+                {
+                    std::wprintf(L"D(C) = D0*exp(γC)\n");
+                    std::wprintf(L"확산계수의 초기값 D0 입력\n");
+                    double diff0;
+                    std::cin >> diff0;
+                    std::wprintf(L"농도에 따른 증감배율 γ 입력\n");
+                    double diffGamma;
+                    std::cin >> diffGamma;
 
-                    double delX, delT, initConc, startDistBC, infDistBC;
-                    int xNum, tNum;
+                    diffFunc = [=](double inputConc) -> double
+                        {
+                            return diff0 * std::exp(diffGamma * inputConc);
+                        };
+                }
+                else if (diffType == 4)
+                {
+                    std::wprintf(L"D(C) = D0*ln(1+γC)\n");
+                    std::wprintf(L"확산계수의 초기값 D0 입력\n");
+                    double diff0;
+                    std::cin >> diff0;
+                    std::wprintf(L"농도에 따른 증감배율 γ 입력\n");
+                    double diffGamma;
+                    std::cin >> diffGamma;
 
-                    //double delX = doubleInput(L"[1] 거리 간격 Δx 입력\n");
-                    //double delT = doubleInput(L"[2] 시간 간격 Δt 입력\n");
-                    //int xNum = intInput(L"[4-1] 거리 시행 횟수 입력\n");
-                    //int tNum = intInput(L"[4-2] 시간 시행 횟수 입력\n");
-                    //double initConc = doubleInput(L"[3-1] 시간 초기조건 입력 C(x,t=0)\n");
-                    //double startDistBC = doubleInput(L"[3-2] 거리 0 경계조건 입력 C(x=0,t)\n");
-                    //double infDistBC = doubleInput(L"[3-3] 거리 ∞ 경계조건 입력 C(x=∞,t)\n");
+                    diffFunc = [=](double inputConc) -> double
+                        {
+                            return diff0 * std::log(1 + diffGamma * inputConc);
+                        };
+                }
 
-                    std::function<double(double)> diffFunc; //농도에 따라 변화하는 확산계수 D(C)
+                delX = 0.1;
+                delT = 0.0005;
+                //delT = 0.05;
+                xNum = 50;
+                tNum = 400;
+                initConc = 1.0;
+                startDistBC = 0; //한계전류 조건
+                infDistBC = initConc;
+
+                std::vector<std::vector<double>> conc;
+                std::vector<double> initConcVec;
+                //초기화
+                for (int i = 0; i < xNum; i++) initConcVec.push_back(initConc);
+                conc.push_back(initConcVec);
 
 
-                    std::wprintf(L"확산계수 D(C) 식의 형태를 입력해주세요.\n");
-                    std::wprintf(L"1. Constant\n");
-                    std::wprintf(L"2. Polynomial\n");
-                    std::wprintf(L"3. Exponential\n");
-                    std::wprintf(L"4. Logarithm\n");
-                    int diffType;
-                    std::cin >> diffType;
+                bool doPrint = false;
+                std::wstring prtAns;
+                std::wprintf(L"데이터를 출력하시겠습니까? [y/n]");
+                std::wcin >> prtAns;
+                if (prtAns == L"y") doPrint = true;
+                else doPrint = false;
 
-
-                    if (diffType == 1)
+                int counter = 0;
+                std::wstring log = L"";
+                //편미분 방정식 계산
+                {
+                    for (int t = 0; t < tNum - 1; t++)
                     {
-                        std::wprintf(L"D(C) = const\n");
-                        std::wprintf(L"확산계수(const) 입력\n");
-                        double diffVal;
-                        std::cin >> diffVal;
-
-                        diffFunc = [=](double inputConc) -> double
-                            {
-                                return diffVal;
-                            };
+                        std::vector<double> concNew(xNum, 0.0);
+                        for (int i = 1; i < xNum - 1; ++i)
+                        {
+                            double diff_halfBefore = diffFunc((conc[t][i] + conc[t][i + 1]) / 2.0);
+                            double diff_halfAfter = diffFunc((conc[t][i] + conc[t][i - 1]) / 2.0);
+                            concNew[i] = conc[t][i] + delT / (delX * delX) * (diff_halfBefore * (conc[t][i + 1] - conc[t][i]) - diff_halfAfter * (conc[t][i] - conc[t][i - 1]));
+                            if (doPrint) std::wprintf(L"{x = %f,  t = %f,  C(x,t) = %f}\n", i*delX, t*delT, concNew[i]);
+                        }
+                        concNew[0] = startDistBC;
+                        concNew[xNum - 1] = infDistBC;
+                        conc.push_back(concNew);
                     }
-                    else if (diffType == 2)
+                }
+
+               
+                Func* targetFunc = new Func();
+                funcSet.push_back(targetFunc);
+
+                targetFunc->myColor = inputCol();
+
+
+                //targetFunc->myColor = { (Uint8)rCol,(Uint8)gCol,(Uint8)bCol };
+                for (int t = 0; t < tNum; t++)
+                {
+                    for (int x = 0; x < xNum; x++)
                     {
-                        std::wprintf(L"D(C) = D0(1+γC)\n");
-                        std::wprintf(L"확산계수의 초기값 D0 입력\n");
-                        double diff0;
-                        std::cin >> diff0;
-                        std::wprintf(L"농도에 따른 증감배율 γ 입력\n");
-                        double diffGamma;
-                        std::cin >> diffGamma;
+                        Point pt;
+                        pt.z = t * delT; //청색 시간
+                        pt.x = x * delX; //적색 거리
+                        pt.y = conc[t][x];
+                        targetFunc->myPoints.push_back(pt);
 
-                        diffFunc = [=](double inputConc) -> double
-                            {
-                                return diff0 * (1+diffGamma* inputConc);
-                            };
+                        
                     }
-                    else if (diffType == 3)
-                    {
-                        std::wprintf(L"D(C) = D0*exp(γC)\n");
-                        std::wprintf(L"확산계수의 초기값 D0 입력\n");
-                        double diff0;
-                        std::cin >> diff0;
-                        std::wprintf(L"농도에 따른 증감배율 γ 입력\n");
-                        double diffGamma;
-                        std::cin >> diffGamma;
+                }
 
-                        diffFunc = [=](double inputConc) -> double
-                            {
-                                return diff0 * std::exp(diffGamma * inputConc);
-                            };
-                    }
-                    else if (diffType == 4)
-                    {
-                        std::wprintf(L"D(C) = D0*ln(1+γC)\n");
-                        std::wprintf(L"확산계수의 초기값 D0 입력\n");
-                        double diff0;
-                        std::cin >> diff0;
-                        std::wprintf(L"농도에 따른 증감배율 γ 입력\n");
-                        double diffGamma;
-                        std::cin >> diffGamma;
+                std::wstring yn;
+                std::wprintf(L"(∂C/∂x)|z=0으로 전류 그래프 i(t)를 그리시겠습니까? [y/n]");
+                std::wcin >> yn;
 
-                        diffFunc = [=](double inputConc) -> double
-                            {
-                                return diff0 * std::log(1 + diffGamma * inputConc);
-                            };
-                    }
-
-                    delX = 0.1;
-                    delT = 0.0005;
-                    xNum = 100;
-                    tNum = 400;
-                    initConc = 1.0;
-                    startDistBC = 0; //한계전류 조건
-                    infDistBC = initConc;
-
-                    std::vector<std::vector<double>> conc;
-                    std::vector<double> initConcVec;
-                    //초기화
-                    for (int i = 0; i < xNum; i++) initConcVec.push_back(initConc);
-                    conc.push_back(initConcVec);
-
-                    //편미분 방정식 계산
+                if (yn == L"y")
+                {
+                    Func* targetFunc2 = new Func();
+                    targetFunc2->myColor = inputCol();
+                    funcSet.push_back(targetFunc2);
+                    std::vector<double> diffData;
+                    //편미분 전류 그래프 생성
                     {
                         for (int t = 0; t < tNum - 1; t++)
                         {
-                            std::vector<double> concNew(xNum, 0.0);
-                            for (int n = 0; n < tNum; ++n)
-                            {
-                                for (int i = 1; i < xNum - 1; ++i)
-                                {
-                                    double diff_halfBefore = diffFunc((conc[t][i] + conc[t][i + 1]) / 2.0);
-                                    double diff_halfAfter = diffFunc((conc[t][i] + conc[t][i - 1]) / 2.0);
-                                    concNew[i] = conc[t][i] + delT / (delX * delX) * (diff_halfBefore * (conc[t][i + 1] - conc[t][i]) - diff_halfAfter * (conc[t][i] - conc[t][i - 1]));
-                                }
-                                concNew[0] = startDistBC;
-                                concNew[xNum - 1] = infDistBC;
-                            }
-                            conc.push_back(concNew);
+                            double diffConc = (conc[t][2] - conc[t][0]) / (2 * delX);
+                            diffData.push_back(diffConc);
+                            targetFunc2->myPoints.push_back({ 0, diffConc, t * delT });
                         }
                     }
-
-                    Func* targetFunc = new Func();
-                    funcSet.push_back(targetFunc);
-                    int rCol, gCol, bCol;
-                    std::wprintf(L"이 데이터의 R값을 뭐로 할까?(~255)\n");
-                    std::cin >> rCol;
-                    std::wprintf(L"이 데이터의 G값을 뭐로 할까?(~255)\n");
-                    std::cin >> gCol;
-                    std::wprintf(L"이 데이터의 B값을 뭐로 할까?(~255)\n");
-                    std::cin >> bCol;
-                    targetFunc->myColor = { (Uint8)rCol,(Uint8)gCol,(Uint8)bCol };
-                    for (int t = 0; t < tNum; t++)
-                    {
-                        for (int x = 0; x < xNum; x++)
-                        {
-                            Point pt;
-                            pt.z = t * delT; //청색 시간
-                            pt.x = x * delX; //적색 거리
-                            pt.y = conc[t][x];
-                            targetFunc->myPoints.push_back(pt);
-                            //std::wprintf(L"데이터 {%f,%f,%f}를 함수 %d에 입력했다.\n", pt.x, pt.y, pt.z, funcSet.size() - 1);
-                        }
-                    }
-
-                    std::wstring yn;
-                    std::wprintf(L"(∂C/∂x)|z=0으로 전류 그래프 i(t)를 그리시겠습니까? [y/n]");
-                    std::wcin >> yn;
-
-                    if (yn == L"y")
-                    {
-                        Func* targetFunc2 = new Func();
-                        int rCol, gCol, bCol;
-                        std::wprintf(L"표면전류 데이터의 R값을 뭐로 할까?(~255)\n");
-                        std::cin >> rCol;
-                        std::wprintf(L"표먼전류 데이터의 G값을 뭐로 할까?(~255)\n");
-                        std::cin >> gCol;
-                        std::wprintf(L"표면전류 데이터의 B값을 뭐로 할까?(~255)\n");
-                        std::cin >> bCol;
-                        targetFunc2->myColor = { (Uint8)rCol,(Uint8)gCol,(Uint8)bCol };
-                        funcSet.push_back(targetFunc2);
-                        std::vector<double> diffData;
-                        //편미분 전류 그래프 생성
-                        {
-                            for (int t = 0; t < tNum - 1; t++)
-                            {
-                                double diffConc = (conc[t][2] - conc[t][0]) / (2 * delX);
-                                diffData.push_back(diffConc);
-                                targetFunc2->myPoints.push_back({ 0, diffConc, t * delT });
-                            }
-                        }
-                    }
-                    else
-                    {
-                    }
-                    std::wprintf(L"모든 계산이 완료되었다.\n");
-
                 }
+                else
+                {
+                }
+                std::wprintf(L"모든 계산이 완료되었다.\n");
             }
             else std::wprintf(L"잘못된 값이 입력되었다.\n");
 
         }
+
 
 
         if (camFixX == true)

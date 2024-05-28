@@ -32,7 +32,7 @@ export bool visInterPoint = true;
 export bool interLine = false;
 export bool crosshair = false;
 
-export float pointSize = 10.0;
+export float pointSize = 3.0;
 
 export std::string xAxisName, yAxisName, zAxisName;
 export std::wstring xScaleUnit, yScaleUnit, zScaleUnit;

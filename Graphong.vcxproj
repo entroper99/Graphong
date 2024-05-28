@@ -106,7 +106,7 @@
       <ConformanceMode>true</ConformanceMode>
       <LanguageStandard>stdcpplatest</LanguageStandard>
       <LanguageStandard_C>stdc17</LanguageStandard_C>
-      <AdditionalIncludeDirectories>$(ProjectDir)\sdl\SDL2-2.0.14\include;$(ProjectDir)\sdl\SDL2_image-2.0.5\include;$(ProjectDir)\sdl\SDL2_mixer-2.0.4\include;$(ProjectDir)\sdl\SDL2_ttf-2.0.15\include;$(ProjectDir)\glew\include\GL;$(ProjectDir)\eigen-3.4.0\eigen-3.4.0</AdditionalIncludeDirectories>
+      <AdditionalIncludeDirectories>$(ProjectDir)\sdl\SDL2-2.0.14\include;$(ProjectDir)\sdl\SDL2_image-2.0.5\include;$(ProjectDir)\sdl\SDL2_mixer-2.0.4\include;$(ProjectDir)\sdl\SDL2_ttf-2.0.15\include;$(ProjectDir)\glew\include\GL;$(ProjectDir)\eigen-3.4.0\eigen-3.4.0;C:\Graphong\glew\include\GL;C:\Graphong\glew\include</AdditionalIncludeDirectories>
       <EnableModules>true</EnableModules>
       <BuildStlModules>true</BuildStlModules>
     </ClCompile>
@@ -139,6 +139,7 @@
     <ClCompile Include="drawer.ixx" />
     <ClCompile Include="Func.ixx" />
     <ClCompile Include="globalVar.ixx" />
+    <ClCompile Include="inputCol.ixx" />
     <ClCompile Include="main.cpp" />
     <ClCompile Include="rainbow.ixx" />
     <ClCompile Include="randomRange.ixx" />

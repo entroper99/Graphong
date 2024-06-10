@@ -1,31 +1,59 @@
+#define _SILENCE_ALL_CXX23_DEPRECATION_WARNINGS
 #include <SDL.h>
+#include <Eigen/Dense>
+
 
 export module Func;
 
 import std;
+import globalVar;
+import constVar;
 import Shapes;
 import randomRange;
 
+auto pointHash = [](const Point& p) -> std::size_t
+    {
+        std::size_t hx = std::hash<double>()(p.x);
+        std::size_t hy = std::hash<double>()(p.y);
+        std::size_t hz = std::hash<double>()(p.z);
+        return hx ^ (hy << 1) ^ (hz << 2);
+    };
 
 export struct Func
 {
     std::wstring funcName = L"NULL";
+    funcFlag funcType = funcFlag::none;
     std::vector<Point> myPoints;
     std::vector<Point> myInterPoints;
     SDL_Color myColor = { 0xff,0xff,0xff };
 
+    std::unordered_map<Point, double, decltype(pointHash)> scalar;
+    double scalarInfimum = 0.0;
+    double scalarSupremum = 1.0;
+
+    //삼각분할 관련 변수
     Triangle superTriangle;
     std::vector < Triangle > triangles;
-
     std::vector<Point> selectPts;
     std::vector<Point> unselectPts = myPoints;
     std::vector<Triangle> checkTriangles;
-
     std::vector<Triangle> badTriangles;
     std::vector<Point> badPts;
     std::vector<Edge> edges;
     bool deleteSupertri = false;
     bool triFirstRun = true;
+
+    std::function<double(double, double, double)> scalarFunc = [](double x, double y, double z)->double { return 0.0; };
+
+    Func(funcFlag inputType) : funcType(inputType)
+    {
+        funcSet.push_back(this);
+    };
+
+    ~Func()
+    {
+        funcSet.erase(std::find(funcSet.begin(), funcSet.end(), this));
+    }
 
     void singleTriangulation()
     {
@@ -53,11 +81,11 @@ export struct Func
             selectPts = { superTriangle.p1,superTriangle.p2,superTriangle.p3 };
 
             unselectPts = myPoints;
-            std::sort(unselectPts.begin(), unselectPts.end(), [](const Point& a, const Point& b) 
+            std::sort(unselectPts.begin(), unselectPts.end(), [](const Point& a, const Point& b)
                 {
-                double distA = a.x * a.x + a.z * a.z;
-                double distB = b.x * b.x + b.z * b.z;
-                return distA < distB;
+                    double distA = a.x * a.x + a.z * a.z;
+                    double distB = b.x * b.x + b.z * b.z;
+                    return distA < distB;
                 });
             triFirstRun = false;
             std::wprintf(L"슈퍼트라이앵글을 생성하였다..\n");
@@ -102,7 +130,7 @@ export struct Func
         std::wprintf(L"[루프 스타트] 선택된 점: (%f, %f, %f)\n", tgtPt.x, tgtPt.y, tgtPt.z);
 
         selectPts.push_back(tgtPt);
-        unselectPts.erase(std::find(unselectPts.begin(),unselectPts.end(),tgtPt));
+        unselectPts.erase(std::find(unselectPts.begin(), unselectPts.end(), tgtPt));
 
         for (auto tri = checkTriangles.begin(); tri != checkTriangles.end();)
         {
@@ -174,7 +202,7 @@ export struct Func
 
         //std::wprintf(L"▽엣지 개수 (중복 제거 후): %d\n", edges.size());
         //for (int i = 0; i < edges.size(); i++) std::wprintf(L"%d번 엣지 : (%f,%f,%f)-(%f,%f,%f) \n", i, edges[i].p1.x, edges[i].p1.y, edges[i].p1.z, edges[i].p2.x, edges[i].p2.y, edges[i].p2.z);
-        
+
         // 뻗어나가는 엣지
         for (int i = 0; i < badPts.size(); i++)
         {
@@ -184,10 +212,10 @@ export struct Func
         //std::wprintf(L"엣지 개수 (뻗어나가는 엣지 추가 후): %d\n", edges.size());
         //for (int i = 0; i < edges.size(); i++) std::wprintf(L"%d번 엣지 : (%f,%f,%f)-(%f,%f,%f) \n", i, edges[i].p1.x, edges[i].p1.y, edges[i].p1.z, edges[i].p2.x, edges[i].p2.y, edges[i].p2.z);
 
-        auto pointHash = [](const Point& p) 
+        auto pointHash = [](const Point& p)
             {
-            std::hash<double> hasher;
-            return ((hasher(p.x) * 73856093) ^ (hasher(p.y) * 19349663) ^ (hasher(p.z) * 83492791));
+                std::hash<double> hasher;
+                return ((hasher(p.x) * 73856093) ^ (hasher(p.y) * 19349663) ^ (hasher(p.z) * 83492791));
             };
 
         std::unordered_map<Point, std::vector<Point>, decltype(pointHash)> edgeMap(0, pointHash);
@@ -242,17 +270,17 @@ export struct Func
 
     void triangulation()
     {
-        for (int i = 0; i < myPoints.size()+1; i++)
+        for (int i = 0; i < myPoints.size() + 1; i++)
         {
             singleTriangulation();
         }
     };
 
-    void sym() 
+    void sym()
     {
         //중심점 계산
         double totalX = 0, totalY = 0, totalZ = 0;
-        for (const auto& point : myPoints) 
+        for (const auto& point : myPoints)
         {
             totalX += point.x;
             totalY += point.y;
@@ -293,6 +321,69 @@ export struct Func
         std::wprintf(L"표준화를 완료하였다.\n");
     }
 
+
+    void rotation(Eigen::Matrix3d inputMat)
+    {
+        std::unordered_map<Point, double, decltype(pointHash)> newScalar;
+        for (int i = 0; i < myPoints.size(); i++)
+        {
+            double originX = myPoints[i].x;
+            double originY = myPoints[i].y;
+            double originZ = myPoints[i].z;
+
+            Eigen::Vector3d vec3;
+            vec3 << originX, originY, originZ;
+
+            Eigen::Vector3d resultVec = inputMat * vec3;
+
+            myPoints[i].x = resultVec[0];
+            myPoints[i].y = resultVec[1];
+            myPoints[i].z = resultVec[2];
+
+            if (funcType == funcFlag::scalarField) newScalar[{myPoints[i].x, myPoints[i].y, myPoints[i].z}] = scalar[{originX, originY, originZ}];
+        }
+        scalar = newScalar;
+    }
+
+    void translation(double inputX, double inputY, double inputZ)
+    {
+        std::unordered_map<Point, double, decltype(pointHash)> newScalar;
+        for (int i = 0; i < myPoints.size(); i++)
+        {
+
+            double originX = myPoints[i].x;
+            double originY = myPoints[i].y;
+            double originZ = myPoints[i].z;
+
+            myPoints[i].x += inputX;
+            myPoints[i].y += inputY;
+            myPoints[i].z += inputZ;
+
+            if (funcType == funcFlag::scalarField) newScalar[{myPoints[i].x, myPoints[i].y, myPoints[i].z}] = scalar[{originX, originY, originZ}];
+        }
+        scalar = newScalar;
+    }
+
+    void scalarCalc()
+    {
+        std::unordered_map<Point, double, decltype(pointHash)> newScalar;
+        for (int i = 0; i < myPoints.size(); i++)
+        {
+            if (funcType == funcFlag::scalarField) newScalar[{myPoints[i].x, myPoints[i].y, myPoints[i].z}] = scalarFunc(myPoints[i].x, myPoints[i].y, myPoints[i].z);
+        }
+        scalar = newScalar;
+    }
+
+    double scalarAvg()
+    {
+        double totalVal = 0;
+        for (int i = 0; i < myPoints.size(); i++)
+        {
+            totalVal += scalar[{myPoints[i].x, myPoints[i].y, myPoints[i].z}];
+        }
+
+        return totalVal / (double)myPoints.size();
+    }
 };
 
 

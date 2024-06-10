@@ -94,7 +94,23 @@ export Circle makeCircumcircle(Triangle t)
     double z = ((ax * ax + az * az) * (cx - bx) + (bx * bx + bz * bz) * (ax - cx) + (cx * cx + cz * cz) * (bx - ax)) / d;
 
     Point center = { x, 0, z };
-    double radius = sqrt((center.x - ax) * (center.x - ax) + (center.z - az) * (center.z - az));
+    double radius = std::sqrt((center.x - ax) * (center.x - ax) + (center.z - az) * (center.z - az));
 
     return { radius, {center.x, 0, center.z} };
 }
+
+export struct Vector
+{
+    double compX = 0;
+    double compY = 0;
+    double compZ = 0;
+
+    Vector(double inputX, double inputY, double inputZ) : compX(inputX), compY(inputY), compZ(inputZ)
+    {
+    }
+};
+
+
+export struct Tensor
+{
+};

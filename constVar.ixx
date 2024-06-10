@@ -2,6 +2,17 @@
 
 export module constVar;
 
+export enum class funcFlag
+{
+    none,
+    dim1,
+    dim2,
+    dim3,
+    scalarField,
+    vectorField,
+    tensorField,
+};
+
 export namespace UNI
 {
     constexpr int NUL = 0;   // Null char

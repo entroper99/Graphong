@@ -4,6 +4,7 @@ export module rainbow;
 
 import std;
 
+//0과 1 사이의 값이 입력됨
 export SDL_Color rainbow(float value) 
 {
     SDL_Color color;

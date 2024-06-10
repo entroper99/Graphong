@@ -1,7 +1,6 @@
 export module globalVar;
 
 import std;
-import Func;
 
 // 카메라 변수
 export float camX = 0.0f;
@@ -37,6 +36,6 @@ export float pointSize = 3.0;
 export std::string xAxisName, yAxisName, zAxisName;
 export std::wstring xScaleUnit, yScaleUnit, zScaleUnit;
 
-export std::vector<Func*> funcSet;
+export std::vector<void*> funcSet;
 
 export std::wstring graphName = L"NO TITLE";

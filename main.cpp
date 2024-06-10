@@ -40,10 +40,10 @@ void prtFuncName()
 {
     for (int i = 0; i < funcSet.size(); i++)
     {
-        std::wcout << "\033[38;2;" << static_cast<int>(funcSet[i]->myColor.r) << ";" << static_cast<int>(funcSet[i]->myColor.g) << ";" << static_cast<int>(funcSet[i]->myColor.b) << "m";
+        std::wcout << "\033[38;2;" << static_cast<int>(((Func*)funcSet[i])->myColor.r) << ";" << static_cast<int>(((Func*)funcSet[i])->myColor.g) << ";" << static_cast<int>(((Func*)funcSet[i])->myColor.b) << "m";
         std::wprintf(L"[ %d번 함수 : ", i);
-        std::wprintf(funcSet[i]->funcName.c_str());
-        std::wprintf(L"] \033[0m 데이터수 : %d 개, 보간데이터 : %d 개, 컬러코드 : %d,%d,%d \n", i, funcSet[i]->myPoints.size(), funcSet[i]->myInterPoints.size(), funcSet[i]->myColor.r, funcSet[i]->myColor.g, funcSet[i]->myColor.b);
+        std::wprintf(((Func*)funcSet[i])->funcName.c_str());
+        std::wprintf(L"] \033[0m 데이터수 : %d 개, 보간데이터 : %d 개, 컬러코드 : %d,%d,%d \n", i, ((Func*)funcSet[i])->myPoints.size(), ((Func*)funcSet[i])->myInterPoints.size(), ((Func*)funcSet[i])->myColor.r, ((Func*)funcSet[i])->myColor.g, ((Func*)funcSet[i])->myColor.b);
     }
 }
 
@@ -106,7 +106,7 @@ int main(int argc, char** argv)
             {
                 if (debugMode)
                 {
-                    funcSet[0]->singleTriangulation();
+                    ((Func*)funcSet[0])->singleTriangulation();
                 }
             }
             else if (event.type == SDL_MOUSEWHEEL)
@@ -151,6 +151,10 @@ int main(int argc, char** argv)
             if (camFixMinusZ || camFixZ || camFixMinusX || camFixX || camFixMinusY || camFixY) std::wprintf(L"7.Axis 카메라 고정 해제\n");
             else std::wprintf(L"7.2차원 카메라 고정\n");
             std::wprintf(L"\033[0;33m8.Delaunay 삼각분할\033[0m\n");
+
+            std::wprintf(L"9. 함수 Translation (평행이동)\n");
+            std::wprintf(L"10. 함수 Rotation (회전)\n");
+
             std::wprintf(L"\033[0;33m11.[2차원] Cubic 스플라인 보간 실행\033[0m\n");
             std::wprintf(L"\033[0;33m12.[2차원] 기존 보간값에 대해 선형 보간 실행\033[0m\n");
             if (visDataPoint)  std::wprintf(L"14.데이터점 화면 표시 [ \033[0;32mON\033[0m / OFF ]\n");
@@ -166,6 +170,7 @@ int main(int argc, char** argv)
             std::wprintf(L"24.함수값 출력\n");
             std::wprintf(L"25.중심점에 대해 함수 표준화\n");
             std::wprintf(L"26.PDE Solver\n");
+            std::wprintf(L"27.LAMMPS Trajectory 파일 읽기\n");
             //std::wprintf(L"\033[37m");
             //std::wprintf(L"101.[Plumed] COLVAR : draw time-# Graph \n");
             //std::wprintf(L"102.[Plumed] COLVAR : draw time-biasPot Graph \n");
@@ -180,28 +185,6 @@ int main(int argc, char** argv)
             std::cin >> input;
             if (input == 1)
             {
-                //openFileDialog();
-                //std::string file;
-                //std::string fileInput;
-                //std::wprintf(L"파일의 경로를 입력해주세요.\n");
-                //std::wprintf(L"data 폴더부터 파일을 읽습니다. 예를 들어 Graphong/data/test.txt라면 터미널에 test.txt를 입력해주세요.\n");
-                //std::wprintf(L"폴더의 경우 Graphong/data/folder/test.txt라면 터미널에 folder/test.txt를 입력해주세요.\n");
-                //std::wprintf(L"--------------------------------------------------------------------------------------------------\n");
-                //int i = 1;
-                //for (const auto& entry : std::filesystem::directory_iterator("data/"))
-                //{
-                //    if (std::filesystem::is_regular_file(entry.status()))
-                //    {
-                //        std::wcout << entry.path().filename().wstring();
-                //        std::wprintf(L"        ");
-                //        if (i % 5 == 0) std::wprintf(L"\n");
-                //        i++;
-                //    }
-                //}
-                //std::wprintf(L"\n----------------------------------▼파일 이름을 입력해주세요▼------------------------------------\n");
-                //std::cin >> fileInput;
-                //file = "data/" + fileInput;
-
                 std::wstring file = L"";
                 std::wprintf(L"데이터가 있는 파일을 선택해주세요.\n");
                 file = openFileDialog();
@@ -232,27 +215,6 @@ int main(int argc, char** argv)
             }
             else if (input == 2)
             {
-                //std::wstring file;
-                //std::wstring fileInput;
-                //std::wprintf(L"파일의 경로를 입력해주세요.\n");
-                //std::wprintf(L"data 폴더부터 파일을 읽습니다. 예를 들어 Graphong/data/test.txt라면 터미널에 test.txt를 입력해주세요.\n");
-                //std::wprintf(L"폴더의 경우 Graphong/data/folder/test.txt라면 터미널에 folder/test.txt를 입력해주세요.\n");
-                //std::wprintf(L"--------------------------------------------------------------------------------------------------\n");
-                //int i = 1;
-                //for (const auto& entry : std::filesystem::directory_iterator("data/"))
-                //{
-                //    if (std::filesystem::is_regular_file(entry.status()))
-                //    {
-                //        std::wcout << entry.path().filename().wstring();
-                //        std::wprintf(L"        ");
-                //        if (i % 5 == 0) std::wprintf(L"\n");
-                //        i++;
-                //    }
-                //}
-                //std::wprintf(L"\n----------------------------------▼파일 이름을 입력해주세요▼------------------------------------\n");
-                //std::wcin >> fileInput;
-                //file = L"data/" + fileInput;
-
                 std::wstring file = L"";
                 std::wprintf(L"데이터가 있는 파일을 선택해주세요.\n");
                 file = openFileDialog();
@@ -301,14 +263,13 @@ int main(int argc, char** argv)
 
                 if (targetIndex == -1)
                 {
-                    Func* targetFunc = new Func();
-                    funcSet.push_back(targetFunc);
+                    Func* targetFunc = new Func(funcFlag::dim3);
                     targetFunc->myPoints.push_back({ inputX,inputY,inputZ });
                     std::wprintf(L"데이터 {%f,%f,%f}를 함수 %d에 입력했다.\n", inputX, inputY, inputZ, funcSet.size() - 1);
                 }
                 else
                 {
-                    funcSet[targetIndex]->myPoints.push_back({ inputX,inputY,inputZ });
+                    ((Func*)funcSet[targetIndex])->myPoints.push_back({ inputX,inputY,inputZ });
                     std::wprintf(L"데이터 {%f,%f,%f}를 함수 %d에 입력했다.\n", inputX, inputY, inputZ, targetIndex);
                 }
             }
@@ -486,8 +447,123 @@ int main(int argc, char** argv)
                 std::wprintf(L"몇번째 데이터에 삼각분할을 실행할까? (0 ~ %d).\n", funcSet.size() - 1);
                 prtFuncName();
                 std::cin >> dataIndex;
-                funcSet[dataIndex]->triangulation();
+                ((Func*)funcSet[dataIndex])->triangulation();
             }
+
+            else if (input == 9)
+            {
+                int dataIndex = 0;
+                std::wprintf(L"몇번째 데이터에 translation을 진행할까? (0 ~ %d).\n", funcSet.size() - 1);
+                prtFuncName();
+                std::cin >> dataIndex;
+
+                double compX = 0, compY = 0, compZ = 0;
+                std::wprintf(L"Translation Vector의 x 성분을 입력해주세요.\n");
+                std::wprintf(L"Vector : { ■, □, □ }\n");
+                std::cin >> compX;
+                std::wprintf(L"Translation Vector의 y 성분을 입력해주세요.\n");
+                std::wprintf(L"Vector : { %f, ■, □ }\n", compX);
+                std::cin >> compY;
+                std::wprintf(L"Translation Vector의 z 성분을 입력해주세요.\n");
+                std::wprintf(L"Vector : { %f, %f, ■ }\n", compX, compY);
+                std::cin >> compZ;
+                std::wprintf(L"다음 벡터로 tranlsation을 진행합니다.\n");
+                std::wprintf(L"Vector : { %f, %f, %f }\n", compX, compY, compZ);
+
+
+                ((Func*)funcSet[dataIndex])->translation(compX,compY,compZ);
+                ((Func*)funcSet[dataIndex])->scalarCalc();
+                std::wprintf(L"이 함수의 평균 f값은 %f이다.\n", ((Func*)funcSet[dataIndex])->scalarAvg());
+            }
+
+            else if (input == 10)
+            {
+                int dataIndex = 0;
+                std::wprintf(L"몇번째 데이터에 rotation을 진행할까? (0 ~ %d).\n", funcSet.size() - 1);
+                prtFuncName();
+                std::cin >> dataIndex;
+
+                double a11 = 1.0, a12 = 0.0, a13 = 0.0;
+                double a21 = 0.0, a22 = 1.0, a23 = 0.0;
+                double a31 = 0.0, a32 = 0.0, a33 = 1.0;
+
+                std::wprintf(L"Rotation Matrix의 a11 성분을 입력해주세요.\n", funcSet.size() - 1);
+                std::wprintf(L"{ ■, □, □ }\n");
+                std::wprintf(L"{ □, □, □ }\n");
+                std::wprintf(L"{ □, □, □ }\n");
+                std::cin >> a11;
+
+                std::wprintf(L"Rotation Matrix의 a12 성분을 입력해주세요.\n", funcSet.size() - 1);
+                std::wprintf(L"{ %f, ■, □ }\n", a11);
+                std::wprintf(L"{ □, □, □ }\n");
+                std::wprintf(L"{ □, □, □ }\n");
+                std::cin >> a12;
+
+                std::wprintf(L"Rotation Matrix의 a13 성분을 입력해주세요.\n");
+                std::wprintf(L"{ %f, %f, ■ }\n", a11, a12);
+                std::wprintf(L"{ □, □, □ }\n");
+                std::wprintf(L"{ □, □, □ }\n");
+                std::cin >> a13;
+
+                std::wprintf(L"Rotation Matrix의 a21 성분을 입력해주세요.\n");
+                std::wprintf(L"{ %f, %f, %f }\n", a11, a12, a13);
+                std::wprintf(L"{ ■, □, □ }\n");
+                std::wprintf(L"{ □, □, □ }\n");
+                std::cin >> a21;
+
+                std::wprintf(L"Rotation Matrix의 a22 성분을 입력해주세요.\n");
+                std::wprintf(L"{ %f, %f, %f }\n", a11, a12, a13);
+                std::wprintf(L"{ %f, ■, □ }\n", a21);
+                std::wprintf(L"{ □, □, □ }\n");
+                std::cin >> a22;
+
+                std::wprintf(L"Rotation Matrix의 a23 성분을 입력해주세요.\n");
+                std::wprintf(L"{ %f, %f, %f }\n", a11, a12, a13);
+                std::wprintf(L"{ %f, %f, ■ }\n", a21, a22);
+                std::wprintf(L"{ □, □, □ }\n");
+                std::cin >> a23;
+
+                std::wprintf(L"Rotation Matrix의 a31 성분을 입력해주세요.\n");
+                std::wprintf(L"{ %f, %f, %f }\n", a11, a12, a13);
+                std::wprintf(L"{ %f, %f, %f }\n", a21, a22, a23);
+                std::wprintf(L"{ ■, □, □ }\n");
+                std::cin >> a31;
+
+                std::wprintf(L"Rotation Matrix의 a32 성분을 입력해주세요.\n");
+                std::wprintf(L"{ %f, %f, %f }\n", a11, a12, a13);
+                std::wprintf(L"{ %f, %f, %f }\n", a21, a22, a23);
+                std::wprintf(L"{ %f, ■, □ }\n", a31);
+                std::cin >> a32;
+
+                std::wprintf(L"Rotation Matrix의 a33 성분을 입력해주세요.\n");
+                std::wprintf(L"{ %f, %f, %f }\n", a11, a12, a13);
+                std::wprintf(L"{ %f, %f, %f }\n", a21, a22, a23);
+                std::wprintf(L"{ %f, %f, ■ }\n", a31, a32);
+                std::cin >> a33;
+
+                Eigen::Matrix3d rotationMatrix;
+
+                //rotationMatrix << 1.0, 0.0, 0.0,
+                //    0.0, 0.7071, -0.7071,
+                //    0.0, 0.7071, 0.7071;
+
+                rotationMatrix << a11, a12, a13,
+                    a21, a22, a23,
+                    a31, a32, a33;
+
+
+
+                std::wprintf(L"다음 행렬로 Rotation을 진행합니다.\n");
+                std::wprintf(L"{ %f, %f, %f }\n", a11, a12, a13);
+                std::wprintf(L"{ %f, %f, %f }\n", a21, a22, a23);
+                std::wprintf(L"{ %f, %f, %f }\n", a31, a32, a33);
+
+
+                ((Func*)funcSet[dataIndex])->rotation(rotationMatrix);
+                ((Func*)funcSet[dataIndex])->scalarCalc();
+                std::wprintf(L"이 함수의 평균 f값은 %f이다.\n", ((Func*)funcSet[dataIndex])->scalarAvg());
+            }
+
             else if (input == 11) //cubic 스플라인 보간 실행
             {
                 int dataIndex = 0;
@@ -579,14 +655,16 @@ int main(int argc, char** argv)
             }
             else if (input == 23) //자이로이드 생성
             {
-                Func* targetFunc = new Func();
-                funcSet.push_back(targetFunc);
-
-
+                Func* targetFunc = new Func(funcFlag::scalarField);
                 int numPoints = 40; // 공간에 존재하는 점의 수, 많을수록 정확해짐
                 double spacing = (2.0 * M_PI) / numPoints; //사이의 공간, 전부 더하면 부피가 됨
+                targetFunc->scalarFunc = [](double x, double y, double z)->double
+                    {
+                        return std::sqrt(8.0 / 3.0) * (std::cos(x - M_PI) * std::sin(y - M_PI) * std::sin(2 * (z - M_PI)) + std::cos(y - M_PI) * std::sin(z - M_PI) * std::sin(2 * (x - M_PI)) + std::cos(z - M_PI) * std::sin(x - M_PI) * std::sin(2 * (y - M_PI)));
+                    };
 
-                double cutoff = 1.0; //이 값 이상의 자이로이드만 화면에 표시됨
+                targetFunc->scalarInfimum = -2.0;// * std::sqrt(2);
+                targetFunc->scalarSupremum = 2.0;// *std::sqrt(2);
 
                 for (int i = -numPoints/2; i < numPoints/2; ++i)
                 {
@@ -598,36 +676,17 @@ int main(int argc, char** argv)
                             double y = j * spacing;
                             double z = k * spacing;
                             double value = std::sqrt(8.0 / 3.0) * (std::cos(x - M_PI) * std::sin(y - M_PI) * std::sin(2 * (z - M_PI)) + std::cos(y - M_PI) * std::sin(z - M_PI) * std::sin(2 * (x - M_PI)) + std::cos(z - M_PI) * std::sin(x - M_PI) * std::sin(2 * (y - M_PI)));
-                            if (value >= cutoff) targetFunc->myPoints.push_back({ x, y, z });
+                            double cutoff = 1.0; //이 값 이상의 자이로이드만 화면에 표시됨
+                            if (1)//(value >= cutoff)
+                            {
+                                targetFunc->myPoints.push_back({ x, y, z });
+                                targetFunc->scalar[{x, y, z}] = value;
+                                //std::wprintf(L"데이터 {%f,%f,%f}의 val값은 %f이다.\n", x, y, z, value);
+                            }
                             //std::wprintf(L"데이터 {%f,%f,%f}를 함수 %d에 입력했다.\n", x, y, z, funcSet.size() - 1);
                         }
                     }
                 }
-
-
-                /*int numPoints = 40; 
-                double spacing = 0.5;*/
-
-                //int numPoints = 40; // 공간에 존재하는 점의 수, 많을수록 정확해짐
-                //double spacing = (2.0 * M_PI) / numPoints; //사이의 공간, 전부 더하면 부피가 됨
-                //
-                //double cutoff = 1.0; //이 값 이상의 자이로이드만 화면에 표시됨
-
-                //for (int i = numPoints; i < numPoints; ++i) 
-                //{
-                //    for (int j = 0; j < numPoints; ++j) 
-                //    {
-                //        for (int k = 0; k < numPoints; ++k) 
-                //        {
-                //            double x = i * spacing;
-                //            double y = j * spacing;
-                //            double z = k * spacing;
-                //            double value = std::sqrt(8.0 / 3.0) * (std::cos(x) * std::sin(y) * std::sin(2 * z) + std::cos(y) * std::sin(z) * std::sin(2 * x) + std::cos(z) * std::sin(x) * std::sin(2 * y));
-                //            if (value >= cutoff) targetFunc->myPoints.push_back({ x, y, z });
-                //            //std::wprintf(L"데이터 {%f,%f,%f}를 함수 %d에 입력했다.\n", x, y, z, funcSet.size() - 1);
-                //        }
-                //    }
-                //}
             }
             else if (input == 24)
             {
@@ -635,9 +694,9 @@ int main(int argc, char** argv)
                 std::wprintf(L"몇번째 데이터의 포인트를 출력할까? (0 ~ %d).\n", funcSet.size() - 1);
                 prtFuncName();
                 std::cin >> dataIndex;
-                for (int i = 0; i < funcSet[dataIndex]->myPoints.size(); i++)
+                for (int i = 0; i < ((Func*)funcSet[dataIndex])->myPoints.size(); i++)
                 {
-                    Point pt = funcSet[dataIndex]->myPoints[i];
+                    Point pt = ((Func*)funcSet[dataIndex])->myPoints[i];
                     std::wprintf(L"Index %d : {%.10f,%.10f,%.10f}\n", i, pt.x, pt.y, pt.z);
                 }
             }
@@ -647,7 +706,7 @@ int main(int argc, char** argv)
                 std::wprintf(L"몇번째 데이터를 대칭 구조로 만들까? (0 ~ %d).\n", funcSet.size() - 1);
                 prtFuncName();
                 std::cin >> dataIndex;
-                funcSet[dataIndex]->sym();
+                ((Func*)funcSet[dataIndex])->sym();
             }
             else if (input == 26)
             {
@@ -752,8 +811,8 @@ int main(int argc, char** argv)
                 }
 
                 delX = 0.1;
-                delT = 0.0005;
-                //delT = 0.05;
+                //delT = 0.0005;
+                delT = 0.05;
                 xNum = 50;
                 tNum = 400;
                 initConc = 1.0;
@@ -775,28 +834,32 @@ int main(int argc, char** argv)
                 else doPrint = false;
 
                 int counter = 0;
+                const int printInterval = 2;
                 std::wstring log = L"";
                 //편미분 방정식 계산
+                for (int t = 0; t < tNum - 1; t++)
                 {
-                    for (int t = 0; t < tNum - 1; t++)
+                    std::vector<double> concNew(xNum, 0.0);
+                    for (int i = 1; i < xNum - 1; ++i)
                     {
-                        std::vector<double> concNew(xNum, 0.0);
-                        for (int i = 1; i < xNum - 1; ++i)
+                        double diff_halfBefore = diffFunc((conc[t][i] + conc[t][i + 1]) / 2.0);
+                        double diff_halfAfter = diffFunc((conc[t][i] + conc[t][i - 1]) / 2.0);
+                        concNew[i] = conc[t][i] + delT / (delX * delX) * (diff_halfBefore * (conc[t][i + 1] - conc[t][i]) - diff_halfAfter * (conc[t][i] - conc[t][i - 1]));
+                        
+                        counter++;
+                        if (doPrint && counter >= printInterval)
                         {
-                            double diff_halfBefore = diffFunc((conc[t][i] + conc[t][i + 1]) / 2.0);
-                            double diff_halfAfter = diffFunc((conc[t][i] + conc[t][i - 1]) / 2.0);
-                            concNew[i] = conc[t][i] + delT / (delX * delX) * (diff_halfBefore * (conc[t][i + 1] - conc[t][i]) - diff_halfAfter * (conc[t][i] - conc[t][i - 1]));
-                            if (doPrint) std::wprintf(L"{x = %f,  t = %f,  C(x,t) = %f}\n", i*delX, t*delT, concNew[i]);
+                            counter = 0;
+                            std::wprintf(L"{x = %f,  t = %f,  C(x,t) = %f}\n", i * delX, t * delT, concNew[i]);
                         }
-                        concNew[0] = startDistBC;
-                        concNew[xNum - 1] = infDistBC;
-                        conc.push_back(concNew);
                     }
+                    concNew[0] = startDistBC;
+                    concNew[xNum - 1] = infDistBC;
+                    conc.push_back(concNew);
                 }
 
                
-                Func* targetFunc = new Func();
-                funcSet.push_back(targetFunc);
+                Func* targetFunc = new Func(funcFlag::dim3);
 
                 targetFunc->myColor = inputCol();
 
@@ -822,9 +885,8 @@ int main(int argc, char** argv)
 
                 if (yn == L"y")
                 {
-                    Func* targetFunc2 = new Func();
+                    Func* targetFunc2 = new Func(funcFlag::dim2);
                     targetFunc2->myColor = inputCol();
-                    funcSet.push_back(targetFunc2);
                     std::vector<double> diffData;
                     //편미분 전류 그래프 생성
                     {
@@ -840,6 +902,70 @@ int main(int argc, char** argv)
                 {
                 }
                 std::wprintf(L"모든 계산이 완료되었다.\n");
+            }
+            else if (input == 27)//trajectory 읽기
+            {
+                std::wstring file = L"";
+                std::wprintf(L"데이터가 있는 파일을 선택해주세요.\n");
+                file = openFileDialog();
+                std::wprintf(L"파일 %ls 를 대상으로 설정하였다.\n", file.c_str());
+                std::wifstream in(file);
+                if (in.is_open())
+                {
+                    readTrj(file, 9, -1, 2, 3, 4,1,2);
+                    Func* tgtFunc = ((Func*)funcSet[funcSet.size() - 1]);
+
+                    //orthogonal box = (-0.111315 -0.111315 -0.111315) to (10.7379 10.7379 10.7379)
+                    //따라서 한변의 지름은 10.7379 - (-0.111315) = 10.849215
+                    double length = 10.849215;
+                    double scaleFactor = 2.0 * M_PI / length;
+
+                    tgtFunc->scalarFunc = [=](double x, double y, double z)->double
+                        {
+                            return (std::cos(scaleFactor *x) * std::sin(scaleFactor * y) * std::sin(2 * (scaleFactor *z)) + std::cos(scaleFactor *y) * std::sin(scaleFactor *z) * std::sin(2 * (scaleFactor *x)) + std::cos(scaleFactor *z) * std::sin(scaleFactor *x) * std::sin(2 * (scaleFactor *y)));
+                        };
+
+                    //박스를 중심으로 옮김
+                    for (int i = 0; i < tgtFunc->myPoints.size(); i++)
+                    {
+                        tgtFunc->myPoints[i].x += 0.111315;
+                        tgtFunc->myPoints[i].y += 0.111315;
+                        tgtFunc->myPoints[i].z += 0.111315;
+
+                        tgtFunc->myPoints[i].x -= length / 2.0;
+                        tgtFunc->myPoints[i].y -= length / 2.0;
+                        tgtFunc->myPoints[i].z -= length / 2.0;
+                    }
+
+                    //{
+                    //    double length = 10.849215;
+                    //    double halfLength = length / 2.0;
+                    //    int gridSize = 30;
+                    //    double start = -5.4;
+                    //    double end = 5.4;
+                    //    double step = (end - start) / (gridSize - 1);
+
+                    //    for (int i = 0; i < gridSize; ++i) 
+                    //    {
+                    //        double x = start + i * step;
+                    //        for (int j = 0; j < gridSize; ++j)
+                    //        {
+                    //            double y = start + j * step;
+                    //            for (int k = 0; k < gridSize; ++k) 
+                    //            {
+                    //                double z = start + k * step;
+                    //                tgtFunc->myPoints.push_back({ x, y, z });
+                    //            }
+                    //        }
+                    //    }
+                    //}
+
+                    tgtFunc->scalarInfimum = -1.0;
+                    tgtFunc->scalarSupremum = 1.0;
+                    tgtFunc->scalarCalc();
+                    std::wprintf(L"이 함수의 평균 f값은 %f이다.\n", tgtFunc->scalarAvg());
+                }
+                else std::wprintf(L"파일을 읽는데 실패하였습니다.\n");
             }
             else std::wprintf(L"잘못된 값이 입력되었다.\n");
 
@@ -1012,84 +1138,116 @@ int main(int argc, char** argv)
         if (camFixY || camFixMinusY) zeroY = 0;
         if (camFixX || camFixMinusX) zeroX = 0;
 
+        //데이터점 그리기
         if (visDataPoint)
         {
             for (int dataIndex = 0; dataIndex < funcSet.size(); dataIndex++)
             {
-                for (int i = 0; i < funcSet[dataIndex]->myPoints.size(); i++)
+                Func* tgtFunc = (Func*)funcSet[dataIndex];
+                for (int i = 0; i < tgtFunc->myPoints.size(); i++)
                 {
                     glPointSize(pointSize);
                     glBegin(GL_POINTS);
-                    glColor3f(((float)funcSet[dataIndex]->myColor.r) / 256.0, ((float)funcSet[dataIndex]->myColor.g) / 256.0, ((float)funcSet[dataIndex]->myColor.b) / 256.0);
-                    glVertex3f(zeroX * xScale * (funcSet[dataIndex]->myPoints[i].x), zeroY * yScale * (funcSet[dataIndex]->myPoints[i].y), zeroZ * zScale * (funcSet[dataIndex]->myPoints[i].z));
+
+
+                    if (tgtFunc->funcType == funcFlag::scalarField)
+                    {
+                        SDL_Color col;
+                        double val = tgtFunc->scalar[tgtFunc->myPoints[i]];
+                        if (val < tgtFunc->scalarInfimum)
+                        {
+                           col = rainbow(0);
+                        }
+                        else if (val > tgtFunc->scalarSupremum)
+                        {
+                           col = rainbow(0.7);
+                        }
+                        else
+                        {
+                           //std::wprintf(L"컬러의 값은 %f이다.\n", 0.7 * ((val - tgtFunc->scalarInfimum) / (tgtFunc->scalarSupremum - tgtFunc->scalarInfimum)));
+                           col = rainbow(0.7* ((val - tgtFunc->scalarInfimum) / (tgtFunc->scalarSupremum - tgtFunc->scalarInfimum)));
+                        }
+                        glColor3f(((float)col.r) / 256.0, ((float)col.g) / 256.0, ((float)col.b) / 256.0);
+                    }
+                    else
+                    {
+                        glColor3f(((float)tgtFunc->myColor.r) / 256.0, ((float)tgtFunc->myColor.g) / 256.0, ((float)tgtFunc->myColor.b) / 256.0);
+                    }
+
+                    glVertex3f(zeroX * xScale * (tgtFunc->myPoints[i].x), zeroY * yScale * (tgtFunc->myPoints[i].y), zeroZ * zScale * (tgtFunc->myPoints[i].z));
                     glEnd();
                 }
             }
         }
 
+        //보간점 그리기
         if (visInterPoint)
         {
-
             for (int dataIndex = 0; dataIndex < funcSet.size(); dataIndex++)
             {
-                for (int i = 0; i < funcSet[dataIndex]->myInterPoints.size(); i++)
+                Func* tgtFunc = (Func*)funcSet[dataIndex];
+                for (int i = 0; i < tgtFunc->myInterPoints.size(); i++)
                 {
                     glPointSize(pointSize);
                     glBegin(GL_POINTS);
-                    glColor3f(((float)funcSet[dataIndex]->myColor.r) / 256.0 / 3.0, ((float)funcSet[dataIndex]->myColor.g) / 256.0 / 3.0, ((float)funcSet[dataIndex]->myColor.b) / 256.0 / 3.0);
-                    glVertex3f(zeroX * xScale * (funcSet[dataIndex]->myInterPoints[i].x), zeroY * yScale * (funcSet[dataIndex]->myInterPoints[i].y), zeroZ * zScale * (funcSet[dataIndex]->myInterPoints[i].z));
+                    glColor3f(((float)tgtFunc->myColor.r) / 256.0 / 3.0, ((float)tgtFunc->myColor.g) / 256.0 / 3.0, ((float)tgtFunc->myColor.b) / 256.0 / 3.0);
+                    glVertex3f(zeroX * xScale * (tgtFunc->myInterPoints[i].x), zeroY * yScale * (tgtFunc->myInterPoints[i].y), zeroZ * zScale * (tgtFunc->myInterPoints[i].z));
                     glEnd();
                 }
             }
         }
 
+        //보간선 그리기 
         if (interLine)
         {
             for (int dataIndex = 0; dataIndex < funcSet.size(); dataIndex++)
             {
-                if (funcSet[dataIndex]->myInterPoints.size() >= 2)
+                Func* tgtFunc = (Func*)funcSet[dataIndex];
+                if (tgtFunc->myInterPoints.size() >= 2)
                 {
-                    for (int i = 0; i < funcSet[dataIndex]->myInterPoints.size() - 1; i++)
+                    for (int i = 0; i < tgtFunc->myInterPoints.size() - 1; i++)
                     {
                         // 라인 그리기
                         glBegin(GL_LINES);
-                        glColor3f(((float)funcSet[dataIndex]->myColor.r) / 256.0, ((float)funcSet[dataIndex]->myColor.g) / 256.0, ((float)funcSet[dataIndex]->myColor.b) / 256.0);
-                        glVertex3f(zeroX * xScale * (funcSet[dataIndex]->myInterPoints[i].x), zeroY * yScale * (funcSet[dataIndex]->myInterPoints[i].y), zeroZ * zScale * (funcSet[dataIndex]->myInterPoints[i].z));
-                        glVertex3f(zeroX * xScale * (funcSet[dataIndex]->myInterPoints[i + 1].x), zeroY * yScale * (funcSet[dataIndex]->myInterPoints[i + 1].y), zeroZ * zScale * (funcSet[dataIndex]->myInterPoints[i + 1].z));
+                        glColor3f(((float)tgtFunc->myColor.r) / 256.0, ((float)tgtFunc->myColor.g) / 256.0, ((float)tgtFunc->myColor.b) / 256.0);
+                        glVertex3f(zeroX * xScale * (tgtFunc->myInterPoints[i].x), zeroY * yScale * (tgtFunc->myInterPoints[i].y), zeroZ * zScale * (tgtFunc->myInterPoints[i].z));
+                        glVertex3f(zeroX * xScale * (tgtFunc->myInterPoints[i + 1].x), zeroY * yScale * (tgtFunc->myInterPoints[i + 1].y), zeroZ * zScale * (tgtFunc->myInterPoints[i + 1].z));
                         glEnd();
                     }
                 }
             }
         }
 
+        //삼각분할 그리기
         for (int dataIndex = 0; dataIndex < funcSet.size(); dataIndex++)
         {
-            for (int i = 0; i < funcSet[dataIndex]->triangles.size(); i++)
+            Func* tgtFunc = (Func*)funcSet[dataIndex];
+            for (int i = 0; i < tgtFunc->triangles.size(); i++)
             {
                 glBegin(GL_LINES);
-                glColor3f(((float)funcSet[dataIndex]->myColor.r) / 256.0, ((float)funcSet[dataIndex]->myColor.g) / 256.0, ((float)funcSet[dataIndex]->myColor.b) / 256.0);
-                glVertex3f(funcSet[dataIndex]->triangles[i].p1.x * zeroX* xScale, funcSet[dataIndex]->triangles[i].p1.y * zeroY* yScale, funcSet[dataIndex]->triangles[i].p1.z * zeroZ* zScale);
-                glVertex3f(funcSet[dataIndex]->triangles[i].p2.x * zeroX* xScale, funcSet[dataIndex]->triangles[i].p2.y * zeroY* yScale, funcSet[dataIndex]->triangles[i].p2.z * zeroZ* zScale);
+                glColor3f(((float)tgtFunc->myColor.r) / 256.0, ((float)tgtFunc->myColor.g) / 256.0, ((float)tgtFunc->myColor.b) / 256.0);
+                glVertex3f(tgtFunc->triangles[i].p1.x * zeroX* xScale, tgtFunc->triangles[i].p1.y * zeroY* yScale, tgtFunc->triangles[i].p1.z * zeroZ* zScale);
+                glVertex3f(tgtFunc->triangles[i].p2.x * zeroX* xScale, tgtFunc->triangles[i].p2.y * zeroY* yScale, tgtFunc->triangles[i].p2.z * zeroZ* zScale);
                 glEnd();
 
                 glBegin(GL_LINES);
-                glColor3f(((float)funcSet[dataIndex]->myColor.r) / 256.0, ((float)funcSet[dataIndex]->myColor.g) / 256.0, ((float)funcSet[dataIndex]->myColor.b) / 256.0);
-                glVertex3f(funcSet[dataIndex]->triangles[i].p1.x * zeroX* xScale, funcSet[dataIndex]->triangles[i].p1.y * zeroY* yScale, funcSet[dataIndex]->triangles[i].p1.z * zeroZ* zScale);
-                glVertex3f(funcSet[dataIndex]->triangles[i].p3.x * zeroX* xScale, funcSet[dataIndex]->triangles[i].p3.y * zeroY* yScale, funcSet[dataIndex]->triangles[i].p3.z * zeroZ* zScale);
+                glColor3f(((float)tgtFunc->myColor.r) / 256.0, ((float)tgtFunc->myColor.g) / 256.0, ((float)tgtFunc->myColor.b) / 256.0);
+                glVertex3f(tgtFunc->triangles[i].p1.x * zeroX* xScale, tgtFunc->triangles[i].p1.y * zeroY* yScale, tgtFunc->triangles[i].p1.z * zeroZ* zScale);
+                glVertex3f(tgtFunc->triangles[i].p3.x * zeroX* xScale, tgtFunc->triangles[i].p3.y * zeroY* yScale, tgtFunc->triangles[i].p3.z * zeroZ* zScale);
                 glEnd();
 
                 glBegin(GL_LINES);
-                glColor3f(((float)funcSet[dataIndex]->myColor.r) / 256.0, ((float)funcSet[dataIndex]->myColor.g) / 256.0, ((float)funcSet[dataIndex]->myColor.b) / 256.0);
-                glVertex3f(funcSet[dataIndex]->triangles[i].p2.x * zeroX* xScale, funcSet[dataIndex]->triangles[i].p2.y * zeroY* yScale, funcSet[dataIndex]->triangles[i].p2.z * zeroZ* zScale);
-                glVertex3f(funcSet[dataIndex]->triangles[i].p3.x * zeroX* xScale, funcSet[dataIndex]->triangles[i].p3.y * zeroY* yScale, funcSet[dataIndex]->triangles[i].p3.z * zeroZ* zScale);
+                glColor3f(((float)tgtFunc->myColor.r) / 256.0, ((float)tgtFunc->myColor.g) / 256.0, ((float)tgtFunc->myColor.b) / 256.0);
+                glVertex3f(tgtFunc->triangles[i].p2.x * zeroX* xScale, tgtFunc->triangles[i].p2.y * zeroY* yScale, tgtFunc->triangles[i].p2.z * zeroZ* zScale);
+                glVertex3f(tgtFunc->triangles[i].p3.x * zeroX* xScale, tgtFunc->triangles[i].p3.y * zeroY* yScale, tgtFunc->triangles[i].p3.z * zeroZ* zScale);
                 glEnd();
 
 
                 //glBegin(GL_TRIANGLES);
-                //glColor3f(((float)funcSet[dataIndex]->myColor.r) / 256.0 / 4.0, ((float)funcSet[dataIndex]->myColor.g) / 256.0 / 4.0, ((float)funcSet[dataIndex]->myColor.b) / 256.0 / 4.0);
-                //glVertex3f(funcSet[dataIndex]->triangles[i].p1.x* xScale, funcSet[dataIndex]->triangles[i].p1.y* yScale, funcSet[dataIndex]->triangles[i].p1.z* zScale);
-                //glVertex3f(funcSet[dataIndex]->triangles[i].p2.x* xScale, funcSet[dataIndex]->triangles[i].p2.y* yScale, funcSet[dataIndex]->triangles[i].p2.z* zScale);
-                //glVertex3f(funcSet[dataIndex]->triangles[i].p3.x* xScale, funcSet[dataIndex]->triangles[i].p3.y* yScale, funcSet[dataIndex]->triangles[i].p3.z* zScale);
+                //glColor3f(((float)tgtFunc->myColor.r) / 256.0 / 4.0, ((float)tgtFunc->myColor.g) / 256.0 / 4.0, ((float)tgtFunc->myColor.b) / 256.0 / 4.0);
+                //glVertex3f(tgtFunc->triangles[i].p1.x* xScale, tgtFunc->triangles[i].p1.y* yScale, tgtFunc->triangles[i].p1.z* zScale);
+                //glVertex3f(tgtFunc->triangles[i].p2.x* xScale, tgtFunc->triangles[i].p2.y* yScale, tgtFunc->triangles[i].p2.z* zScale);
+                //glVertex3f(tgtFunc->triangles[i].p3.x* xScale, tgtFunc->triangles[i].p3.y* yScale, tgtFunc->triangles[i].p3.z* zScale);
 
                 glEnd();
 

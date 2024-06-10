@@ -134,6 +134,7 @@
     </Link>
   </ItemDefinitionGroup>
   <ItemGroup>
+    <ClCompile Include="addGyroid.ixx" />
     <ClCompile Include="constVar.ixx" />
     <ClCompile Include="cubicSpline.ixx" />
     <ClCompile Include="drawer.ixx" />

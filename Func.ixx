@@ -278,6 +278,9 @@ export struct Func
 
     void sym()
     {
+        
+        std::wprintf(L"표준화 실행 전의 평균 f값은 %f이다.\n", scalarAvg());
+
         //중심점 계산
         double totalX = 0, totalY = 0, totalZ = 0;
         for (const auto& point : myPoints)
@@ -290,35 +293,86 @@ export struct Func
         double centerY = totalY / myPoints.size();
         double centerZ = totalZ / myPoints.size();
 
-        double rcs = 1.0; // 가중치 함수의 스무스 컷오프 파라미터
-        double rc = 10.0;  // 컷오프 거리
-
-        std::vector<Point> newPoints;
-        for (const auto& point : myPoints)
+        //데이터를 원점을 기준으로 변경
+        for (int i = 0; i < myPoints.size(); i++)
         {
-            //중심점으로부터의 상대거리
-            double xji = point.x - centerX;
-            double yji = point.y - centerY;
-            double zji = point.z - centerZ;
-            double rji = std::sqrt(xji * xji + yji * yji + zji * zji);
-
-            // 가중치 함수 계산
-            double s_rji;
-            if (rji < rcs)  s_rji = 1.0 / rji;
-            else if (rji < rc) s_rji = 1.0 / rji * (0.5 * cos(M_PI * (rji - rcs) / (rc - rcs)) + 0.5);
-            else  s_rji = 0.0;
-
-            // 대칭 변환된 좌표 계산 (일단은 중심점과의 상대거리로 계산하였음)
-            double newX =/* centerX + */s_rji * xji;
-            double newY = /*centerY + */s_rji * yji;
-            double newZ = /*centerZ + */s_rji * zji;
-
-            newPoints.push_back({ newX, newY, newZ });
+            myPoints[i].x -= centerX;
+            myPoints[i].y -= centerY;
+            myPoints[i].z -= centerZ;
         }
 
-        myPoints = newPoints;
+        Eigen::MatrixXd matX;
+        matX.resize(myPoints.size(), 3);
+        
 
+        for (int row = 0; row < myPoints.size(); row++)
+        {
+            matX(row, 0) = myPoints[row].x;
+            matX(row, 1) = myPoints[row].y;
+            matX(row, 2) = myPoints[row].z;
+        }
+        
+        Eigen::MatrixXd matXT = matX.transpose();
+        Eigen::MatrixXd matCov = (1.0/(double)myPoints.size()) * (matXT * matX);
+
+        Eigen::SelfAdjointEigenSolver<Eigen::MatrixXd> solver(matCov);
+        Eigen::VectorXd eigenvalues = solver.eigenvalues();
+        Eigen::MatrixXd eigenvectors = solver.eigenvectors();
+
+
+        std::cout << "Eigenvalues " << ":\n" << eigenvalues << "\n\n";
+        for (int i = 0; i < eigenvectors.cols(); ++i) 
+        {
+            std::cout << "Eigenvector " << i + 1 << ":\n" << eigenvectors.col(i) << "\n\n";
+        }
+
+        double maxVal = eigenvalues[0];
+        int maxIndex = 0;
+
+        for (int i = 1; i < eigenvalues.size(); ++i) 
+        {
+            double currentVal = eigenvalues[i];
+            if (currentVal > maxVal)
+            {
+                maxVal = currentVal;
+                maxIndex = i;
+            }
+        }
+
+        Eigen::Matrix3d tgtMat;
+        tgtMat = eigenvectors;
+
+        Eigen::Matrix3d originMat;
+        originMat << 1.0, 0.0, 0.0,
+            0.0, 1.0, 0,
+            0.0, 0, 1.0;
+        
+        //originMat << -0.743409, -0.368947, -0.557872,
+        //    0.242377, 0.62879, -0.738835,
+        //    0.623375, -0.684472, -0.378024;
+
+        Eigen::Matrix3d rotationMat = originMat * tgtMat.inverse();
+
+        std::cout << "\n회전행렬 " << ":\n" << rotationMat << "\n\n";
+
+        {
+            Eigen::Matrix3d checkMat = rotationMat;
+            double trace = checkMat.trace();
+            double theta = std::acos((trace - 1) / 2);
+            Eigen::Vector3d axis;
+            axis << checkMat(2, 1) - checkMat(1, 2),
+                checkMat(0, 2) - checkMat(2, 0),
+                checkMat(1, 0) - checkMat(0, 1);
+            axis.normalize();
+            std::cout << "회전각 : " << theta * 180.0 / M_PI << std::endl;
+            std::cout << "회전축: (" << axis.x() << ", " << axis.y() << ", " << axis.z() << ")" << std::endl;
+        }
+
+        rotation(rotationMat);
+
+        scalarCalc();
         std::wprintf(L"표준화를 완료하였다.\n");
+        std::wprintf(L"\033[0;33m이 함수의 표준화 후 평균 f값은 %f이다.\033[0m\n", scalarAvg());
     }
 
 

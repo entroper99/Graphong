@@ -558,6 +558,20 @@ int main(int argc, char** argv)
                 std::wprintf(L"{ %f, %f, %f }\n", a21, a22, a23);
                 std::wprintf(L"{ %f, %f, %f }\n", a31, a32, a33);
 
+                {
+                    Eigen::Matrix3d checkMat = rotationMatrix;
+                    double trace = checkMat.trace();
+                    double theta = std::acos((trace - 1) / 2);
+                    Eigen::Vector3d axis;
+                    axis << checkMat(2, 1) - checkMat(1, 2),
+                        checkMat(0, 2) - checkMat(2, 0),
+                        checkMat(1, 0) - checkMat(0, 1);
+                    axis.normalize();
+                    std::cout << "회전각 : " << theta * 180.0 / M_PI << std::endl;
+                    std::cout << "회전축: (" << axis.x() << ", " << axis.y() << ", " << axis.z() << ")" << std::endl;
+                }
+
+
 
                 ((Func*)funcSet[dataIndex])->rotation(rotationMatrix);
                 ((Func*)funcSet[dataIndex])->scalarCalc();
@@ -703,7 +717,7 @@ int main(int argc, char** argv)
             else if (input == 25) //데이터 표준화
             {
                 int dataIndex = 0;
-                std::wprintf(L"몇번째 데이터를 대칭 구조로 만들까? (0 ~ %d).\n", funcSet.size() - 1);
+                std::wprintf(L"몇번째 데이터를 표준화시킬까? (0 ~ %d).\n", funcSet.size() - 1);
                 prtFuncName();
                 std::cin >> dataIndex;
                 ((Func*)funcSet[dataIndex])->sym();
@@ -915,6 +929,7 @@ int main(int argc, char** argv)
                     readTrj(file, 9, -1, 2, 3, 4,1,2);
                     Func* tgtFunc = ((Func*)funcSet[funcSet.size() - 1]);
 
+                    tgtFunc->myPoints.clear();
                     //orthogonal box = (-0.111315 -0.111315 -0.111315) to (10.7379 10.7379 10.7379)
                     //따라서 한변의 지름은 10.7379 - (-0.111315) = 10.849215
                     double length = 10.849215;
@@ -925,40 +940,40 @@ int main(int argc, char** argv)
                             return (std::cos(scaleFactor *x) * std::sin(scaleFactor * y) * std::sin(2 * (scaleFactor *z)) + std::cos(scaleFactor *y) * std::sin(scaleFactor *z) * std::sin(2 * (scaleFactor *x)) + std::cos(scaleFactor *z) * std::sin(scaleFactor *x) * std::sin(2 * (scaleFactor *y)));
                         };
 
-                    //박스를 중심으로 옮김
-                    for (int i = 0; i < tgtFunc->myPoints.size(); i++)
-                    {
-                        tgtFunc->myPoints[i].x += 0.111315;
-                        tgtFunc->myPoints[i].y += 0.111315;
-                        tgtFunc->myPoints[i].z += 0.111315;
-
-                        tgtFunc->myPoints[i].x -= length / 2.0;
-                        tgtFunc->myPoints[i].y -= length / 2.0;
-                        tgtFunc->myPoints[i].z -= length / 2.0;
-                    }
-
+                    ////박스를 중심으로 옮김
+                    //for (int i = 0; i < tgtFunc->myPoints.size(); i++)
                     //{
-                    //    double length = 10.849215;
-                    //    double halfLength = length / 2.0;
-                    //    int gridSize = 30;
-                    //    double start = -5.4;
-                    //    double end = 5.4;
-                    //    double step = (end - start) / (gridSize - 1);
+                    //    tgtFunc->myPoints[i].x += 0.111315;
+                    //    tgtFunc->myPoints[i].y += 0.111315;
+                    //    tgtFunc->myPoints[i].z += 0.111315;
 
-                    //    for (int i = 0; i < gridSize; ++i) 
-                    //    {
-                    //        double x = start + i * step;
-                    //        for (int j = 0; j < gridSize; ++j)
-                    //        {
-                    //            double y = start + j * step;
-                    //            for (int k = 0; k < gridSize; ++k) 
-                    //            {
-                    //                double z = start + k * step;
-                    //                tgtFunc->myPoints.push_back({ x, y, z });
-                    //            }
-                    //        }
-                    //    }
+                    //    tgtFunc->myPoints[i].x -= length / 2.0;
+                    //    tgtFunc->myPoints[i].y -= length / 2.0;
+                    //    tgtFunc->myPoints[i].z -= length / 2.0;
                     //}
+
+                    {
+                        double length = 10.849215;
+                        double halfLength = length / 2.0;
+                        int gridSize = 30;
+                        double start = -0.111315;
+                        double end = 10.7379;
+                        double step = (end - start) / (gridSize - 1);
+
+                        for (int i = 0; i < gridSize; ++i) 
+                        {
+                            double x = start + i * step;
+                            for (int j = 0; j < gridSize; ++j)
+                            {
+                                double y = start + j * step;
+                                for (int k = 0; k < gridSize; ++k) 
+                                {
+                                    double z = start + k * step;
+                                    tgtFunc->myPoints.push_back({ x, y, z });
+                                }
+                            }
+                        }
+                    }
 
                     tgtFunc->scalarInfimum = -1.0;
                     tgtFunc->scalarSupremum = 1.0;

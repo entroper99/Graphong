@@ -27,9 +27,6 @@
     <ClCompile Include="drawer.ixx">
       <Filter>소스 파일</Filter>
     </ClCompile>
-    <ClCompile Include="Func.ixx">
-      <Filter>소스 파일</Filter>
-    </ClCompile>
     <ClCompile Include="read.ixx">
       <Filter>소스 파일</Filter>
     </ClCompile>
@@ -49,6 +46,9 @@
       <Filter>소스 파일</Filter>
     </ClCompile>
     <ClCompile Include="addGyroid.ixx">
+      <Filter>소스 파일</Filter>
+    </ClCompile>
+    <ClCompile Include="Func.ixx">
       <Filter>소스 파일</Filter>
     </ClCompile>
   </ItemGroup>

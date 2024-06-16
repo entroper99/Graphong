@@ -20,6 +20,14 @@ export struct Point
     }
 };
 
+export auto pointHash = [](const Point& p) -> std::size_t
+    {
+        std::size_t hx = std::hash<double>()(p.x);
+        std::size_t hy = std::hash<double>()(p.y);
+        std::size_t hz = std::hash<double>()(p.z);
+        return hx ^ (hy << 1) ^ (hz << 2);
+    };
+
 export struct Triangle
 {
     Point p1, p2, p3;

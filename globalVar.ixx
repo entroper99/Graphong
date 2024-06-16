@@ -39,3 +39,4 @@ export std::wstring xScaleUnit, yScaleUnit, zScaleUnit;
 export std::vector<void*> funcSet;
 
 export std::wstring graphName = L"NO TITLE";
+

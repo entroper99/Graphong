@@ -2,7 +2,6 @@
 #include <SDL.h>
 #include <Eigen/Dense>
 
-
 export module Func;
 
 import std;
@@ -10,14 +9,6 @@ import globalVar;
 import constVar;
 import Shapes;
 import randomRange;
-
-auto pointHash = [](const Point& p) -> std::size_t
-    {
-        std::size_t hx = std::hash<double>()(p.x);
-        std::size_t hy = std::hash<double>()(p.y);
-        std::size_t hz = std::hash<double>()(p.z);
-        return hx ^ (hy << 1) ^ (hz << 2);
-    };
 
 export struct Func
 {
@@ -42,6 +33,12 @@ export struct Func
     std::vector<Edge> edges;
     bool deleteSupertri = false;
     bool triFirstRun = true;
+
+    inline static bool hasTransform = false;
+    inline static Eigen::Vector3d transVec;
+    inline static Eigen::Matrix3d rotMat;
+
+    double period = 0.0;
 
     std::function<double(double, double, double)> scalarFunc = [](double x, double y, double z)->double { return 0.0; };
 
@@ -276,87 +273,98 @@ export struct Func
         }
     };
 
-    void sym()
+    void normalize(double inputPeriod)
     {
-        
         std::wprintf(L"표준화 실행 전의 평균 f값은 %f이다.\n", scalarAvg());
 
-        //중심점 계산
-        double totalX = 0, totalY = 0, totalZ = 0;
-        for (const auto& point : myPoints)
-        {
-            totalX += point.x;
-            totalY += point.y;
-            totalZ += point.z;
-        }
-        double centerX = totalX / myPoints.size();
-        double centerY = totalY / myPoints.size();
-        double centerZ = totalZ / myPoints.size();
-
-        //데이터를 원점을 기준으로 변경
-        for (int i = 0; i < myPoints.size(); i++)
-        {
-            myPoints[i].x -= centerX;
-            myPoints[i].y -= centerY;
-            myPoints[i].z -= centerZ;
-        }
-
-        Eigen::MatrixXd matX;
-        matX.resize(myPoints.size(), 3);
-        
-
-        for (int row = 0; row < myPoints.size(); row++)
-        {
-            matX(row, 0) = myPoints[row].x;
-            matX(row, 1) = myPoints[row].y;
-            matX(row, 2) = myPoints[row].z;
-        }
-        
-        Eigen::MatrixXd matXT = matX.transpose();
-        Eigen::MatrixXd matCov = (1.0/(double)myPoints.size()) * (matXT * matX);
-
-        Eigen::SelfAdjointEigenSolver<Eigen::MatrixXd> solver(matCov);
-        Eigen::VectorXd eigenvalues = solver.eigenvalues();
-        Eigen::MatrixXd eigenvectors = solver.eigenvectors();
-
-
-        std::cout << "Eigenvalues " << ":\n" << eigenvalues << "\n\n";
-        for (int i = 0; i < eigenvectors.cols(); ++i) 
-        {
-            std::cout << "Eigenvector " << i + 1 << ":\n" << eigenvectors.col(i) << "\n\n";
-        }
-
-        double maxVal = eigenvalues[0];
-        int maxIndex = 0;
-
-        for (int i = 1; i < eigenvalues.size(); ++i) 
-        {
-            double currentVal = eigenvalues[i];
-            if (currentVal > maxVal)
+        //고유 스칼라 함수 변경
+        period = inputPeriod;
+        double scaleFactor = 2.0 * M_PI / period;
+        scalarFunc = [=](double x, double y, double z)->double
             {
-                maxVal = currentVal;
-                maxIndex = i;
+                return (std::cos(scaleFactor * x) * std::sin(scaleFactor * y) * std::sin(2 * (scaleFactor * z)) + std::cos(scaleFactor * y) * std::sin(scaleFactor * z) * std::sin(2 * (scaleFactor * x)) + std::cos(scaleFactor * z) * std::sin(scaleFactor * x) * std::sin(2 * (scaleFactor * y)));
+            };
+
+
+        if (hasTransform == false)
+        {
+            //중심점 계산
+            double totalX = 0, totalY = 0, totalZ = 0;
+            for (const auto& point : myPoints)
+            {
+                totalX += point.x;
+                totalY += point.y;
+                totalZ += point.z;
             }
+            double centerX = totalX / myPoints.size();
+            double centerY = totalY / myPoints.size();
+            double centerZ = totalZ / myPoints.size();
+
+
+            //데이터를 원점을 기준으로 변경
+            for (int i = 0; i < myPoints.size(); i++)
+            {
+                myPoints[i].x -= centerX;
+                myPoints[i].y -= centerY;
+                myPoints[i].z -= centerZ;
+            }
+
+
+            Eigen::MatrixXd matX;
+            matX.resize(myPoints.size(), 3);
+
+            for (int row = 0; row < myPoints.size(); row++)
+            {
+                matX(row, 0) = myPoints[row].x;
+                matX(row, 1) = myPoints[row].y;
+                matX(row, 2) = myPoints[row].z;
+            }
+
+            Eigen::MatrixXd matXT = matX.transpose();
+            Eigen::MatrixXd matCov = (1.0 / (double)myPoints.size()) * (matXT * matX);
+
+            Eigen::SelfAdjointEigenSolver<Eigen::MatrixXd> solver(matCov);
+            Eigen::VectorXd eigenvalues = solver.eigenvalues();
+            Eigen::MatrixXd eigenvectors = solver.eigenvectors();
+
+            std::cout << "Eigenvalues " << ":\n" << eigenvalues << "\n\n";
+            for (int i = 0; i < eigenvectors.cols(); ++i)
+            {
+                std::cout << "Eigenvector " << i + 1 << ":\n" << eigenvectors.col(i) << "\n\n";
+            }
+
+            double maxVal = eigenvalues[0];
+            int maxIndex = 0;
+
+            for (int i = 1; i < eigenvalues.size(); ++i)
+            {
+                double currentVal = eigenvalues[i];
+                if (currentVal > maxVal)
+                {
+                    maxVal = currentVal;
+                    maxIndex = i;
+                }
+            }
+
+            Eigen::Matrix3d tgtMat;
+            tgtMat = eigenvectors;
+
+            Eigen::Matrix3d originMat;
+            originMat << -0.743409, -0.368947, -0.557872,
+                0.242377, 0.62879, -0.738835,
+                0.623375, -0.684472, -0.378024;
+
+            Eigen::Matrix3d rotationMat = originMat * tgtMat.inverse();
+
+            hasTransform = true;
+            transVec = { -centerX,-centerY,-centerZ };
+            rotMat = rotationMat;
         }
 
-        Eigen::Matrix3d tgtMat;
-        tgtMat = eigenvectors;
-
-        Eigen::Matrix3d originMat;
-        originMat << 1.0, 0.0, 0.0,
-            0.0, 1.0, 0,
-            0.0, 0, 1.0;
-        
-        //originMat << -0.743409, -0.368947, -0.557872,
-        //    0.242377, 0.62879, -0.738835,
-        //    0.623375, -0.684472, -0.378024;
-
-        Eigen::Matrix3d rotationMat = originMat * tgtMat.inverse();
-
-        std::cout << "\n회전행렬 " << ":\n" << rotationMat << "\n\n";
-
+        std::cout << "\n평행이동 벡터" << ":\n" << transVec << "\n\n";
+        std::cout << "\n회전행렬 " << ":\n" << rotMat << "\n\n";
         {
-            Eigen::Matrix3d checkMat = rotationMat;
+            Eigen::Matrix3d checkMat = rotMat;
             double trace = checkMat.trace();
             double theta = std::acos((trace - 1) / 2);
             Eigen::Vector3d axis;
@@ -368,7 +376,7 @@ export struct Func
             std::cout << "회전축: (" << axis.x() << ", " << axis.y() << ", " << axis.z() << ")" << std::endl;
         }
 
-        rotation(rotationMat);
+        rotation(rotMat);
 
         scalarCalc();
         std::wprintf(L"표준화를 완료하였다.\n");
@@ -430,13 +438,47 @@ export struct Func
 
     double scalarAvg()
     {
+        //double totalVal = 0;
+        //for (int i = 0; i < myPoints.size(); i++)
+        //{
+        //    totalVal += scalar[{myPoints[i].x, myPoints[i].y, myPoints[i].z}];
+        //}
+
+        //return totalVal / (double)myPoints.size();
+
         double totalVal = 0;
         for (int i = 0; i < myPoints.size(); i++)
         {
-            totalVal += scalar[{myPoints[i].x, myPoints[i].y, myPoints[i].z}];
+            double val = scalar[{myPoints[i].x, myPoints[i].y, myPoints[i].z}];
+            totalVal += val * val;
         }
 
-        return totalVal / (double)myPoints.size();
+        return std::sqrt(totalVal);
+    }
+
+    double scalarL2Norm()
+    {
+        double totalVal = 0;
+        for (int i = 0; i < myPoints.size(); i++)
+        {
+            double val = scalar[{myPoints[i].x, myPoints[i].y, myPoints[i].z}];
+            totalVal += val * val;
+        }
+
+        return std::sqrt(totalVal);
+    }
+
+    double scalarSquareAvg()
+    {
+        double totalVal = 0;
+        for (int i = 0; i < myPoints.size(); i++)
+        {
+            double val = scalar[{myPoints[i].x, myPoints[i].y, myPoints[i].z}];
+            totalVal += val * val;
+        }
+
+        double meanVal = totalVal / (double)myPoints.size();
+        return std::sqrt(meanVal);
     }
 };
 

@@ -7,15 +7,19 @@
 #include <codecvt>
 #include <windows.h>
 
+#include <fstream>
+#include <string>
+#include <iostream>
+
 import std;
 import globalVar;
 import constVar;
 import drawer;
-import Func;
 import read;
 import rainbow;
 import cubicSpline;
 import inputCol;
+import Func;
 
 
 std::wstring openFileDialog() 
@@ -170,7 +174,8 @@ int main(int argc, char** argv)
             std::wprintf(L"24.함수값 출력\n");
             std::wprintf(L"25.중심점에 대해 함수 표준화\n");
             std::wprintf(L"26.PDE Solver\n");
-            std::wprintf(L"27.LAMMPS Trajectory 파일 읽기\n");
+            std::wprintf(L"27.LAMMPS Trajectory 파일 읽기(타임스텝 0)\n");
+            std::wprintf(L"28.LAMMPS Trajectory 파일 읽기(모든 타임스텝)\n");
             //std::wprintf(L"\033[37m");
             //std::wprintf(L"101.[Plumed] COLVAR : draw time-# Graph \n");
             //std::wprintf(L"102.[Plumed] COLVAR : draw time-biasPot Graph \n");
@@ -720,7 +725,7 @@ int main(int argc, char** argv)
                 std::wprintf(L"몇번째 데이터를 표준화시킬까? (0 ~ %d).\n", funcSet.size() - 1);
                 prtFuncName();
                 std::cin >> dataIndex;
-                ((Func*)funcSet[dataIndex])->sym();
+                ((Func*)funcSet[dataIndex])->normalize(GYROID_PERIOD);
             }
             else if (input == 26)
             {
@@ -926,54 +931,20 @@ int main(int argc, char** argv)
                 std::wifstream in(file);
                 if (in.is_open())
                 {
-                    readTrj(file, 9, -1, 2, 3, 4,1,2);
+                    readTrjFile(file, 9, -1, 2, 3, 4,1,2);
                     Func* tgtFunc = ((Func*)funcSet[funcSet.size() - 1]);
+                    tgtFunc->period = GYROID_PERIOD;
 
-                    tgtFunc->myPoints.clear();
+                    //tgtFunc->myPoints.clear();
                     //orthogonal box = (-0.111315 -0.111315 -0.111315) to (10.7379 10.7379 10.7379)
                     //따라서 한변의 지름은 10.7379 - (-0.111315) = 10.849215
-                    double length = 10.849215;
+                    double length = GYROID_PERIOD;
                     double scaleFactor = 2.0 * M_PI / length;
 
                     tgtFunc->scalarFunc = [=](double x, double y, double z)->double
                         {
                             return (std::cos(scaleFactor *x) * std::sin(scaleFactor * y) * std::sin(2 * (scaleFactor *z)) + std::cos(scaleFactor *y) * std::sin(scaleFactor *z) * std::sin(2 * (scaleFactor *x)) + std::cos(scaleFactor *z) * std::sin(scaleFactor *x) * std::sin(2 * (scaleFactor *y)));
                         };
-
-                    ////박스를 중심으로 옮김
-                    //for (int i = 0; i < tgtFunc->myPoints.size(); i++)
-                    //{
-                    //    tgtFunc->myPoints[i].x += 0.111315;
-                    //    tgtFunc->myPoints[i].y += 0.111315;
-                    //    tgtFunc->myPoints[i].z += 0.111315;
-
-                    //    tgtFunc->myPoints[i].x -= length / 2.0;
-                    //    tgtFunc->myPoints[i].y -= length / 2.0;
-                    //    tgtFunc->myPoints[i].z -= length / 2.0;
-                    //}
-
-                    {
-                        double length = 10.849215;
-                        double halfLength = length / 2.0;
-                        int gridSize = 30;
-                        double start = -0.111315;
-                        double end = 10.7379;
-                        double step = (end - start) / (gridSize - 1);
-
-                        for (int i = 0; i < gridSize; ++i) 
-                        {
-                            double x = start + i * step;
-                            for (int j = 0; j < gridSize; ++j)
-                            {
-                                double y = start + j * step;
-                                for (int k = 0; k < gridSize; ++k) 
-                                {
-                                    double z = start + k * step;
-                                    tgtFunc->myPoints.push_back({ x, y, z });
-                                }
-                            }
-                        }
-                    }
 
                     tgtFunc->scalarInfimum = -1.0;
                     tgtFunc->scalarSupremum = 1.0;
@@ -982,8 +953,53 @@ int main(int argc, char** argv)
                 }
                 else std::wprintf(L"파일을 읽는데 실패하였습니다.\n");
             }
-            else std::wprintf(L"잘못된 값이 입력되었다.\n");
+            else if (input == 28)//trajectory 읽기(모든 타임스텝)
+            {
+                for(int atomType = 1; atomType <=2; atomType++)
+                {
+                    std::wstring file = L"";
+                    std::wprintf(L"데이터가 있는 파일을 선택해주세요.\n");
+                    file = openFileDialog();
+                    std::wprintf(L"파일 %ls 를 대상으로 설정하였다.\n", file.c_str());
+                    std::ifstream in(file);
+                    if (in.is_open())
+                    {
+                        std::string str;
+                        in.seekg(0, std::ios::end);
+                        size_t size = in.tellg();
+                        str.resize(size);
+                        in.seekg(0, std::ios::beg);
+                        in.read(&str[0], size);
+                        in.close();
 
+                        Func* timeGraphFunc = new Func(funcFlag::scalarField);
+                        timeGraphFunc->funcType = funcFlag::dim2;
+                        timeGraphFunc->funcName = L"TIME-STEP F_AVG";
+                        timeGraphFunc->myColor = inputCol();
+
+                        int i = 0;
+                        while (1)
+                        {
+                            readTrjString(str, 9, -1, 2, 3, 4, 1, atomType);
+                            Func* tgtGyroid = ((Func*)funcSet[funcSet.size() - 1]);
+                            tgtGyroid->normalize(GYROID_PERIOD);
+                            tgtGyroid->scalarCalc();
+                            timeGraphFunc->myPoints.push_back({ (double)i,tgtGyroid->scalarSquareAvg(),0 });
+                            delete tgtGyroid;
+
+                            size_t firstTimestepPos = str.find("ITEM: TIMESTEP");
+                            size_t secondTimestepPos = str.find("ITEM: TIMESTEP", firstTimestepPos + 1);
+                            if (secondTimestepPos == std::string::npos) break;
+                            else str = str.substr(secondTimestepPos);
+                            i++;
+                        }
+                    }
+                    else std::wprintf(L"파일을 읽는데 실패하였습니다.\n");
+
+                    Func::hasTransform = false;
+                }
+            }
+            else std::wprintf(L"잘못된 값이 입력되었다.\n");
         }
 
 
@@ -1059,7 +1075,7 @@ int main(int argc, char** argv)
         glRotatef(camYaw, 0.0f, 1.0f, 0.0f);
         glTranslatef(-camX, -camY, -camZ);
 
-        float axisLength = 1000.0f;
+        float axisLength = 10000.0f;
 
         // x축 그리기
         if (!camFixX && !camFixMinusX)

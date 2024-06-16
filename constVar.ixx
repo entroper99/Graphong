@@ -184,3 +184,6 @@ export namespace lowCol
     constexpr SDL_Color pink = { 0xbe,0x3f,0xd0 };
     constexpr SDL_Color crimson = { 0xd0,0x3f,0x89 };
 };
+
+
+export const double GYROID_PERIOD = 10.849215;

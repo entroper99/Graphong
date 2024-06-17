@@ -275,7 +275,7 @@ export struct Func
 
     void normalize(double inputPeriod)
     {
-        std::wprintf(L"표준화 실행 전의 평균 f값은 %f이다.\n", scalarAvg());
+        std::wprintf(L"표준화 실행 전의 평균 f값은 %f이다.\n", scalarSquareAvg());
 
         //고유 스칼라 함수 변경
         period = inputPeriod;
@@ -380,7 +380,7 @@ export struct Func
 
         scalarCalc();
         std::wprintf(L"표준화를 완료하였다.\n");
-        std::wprintf(L"\033[0;33m이 함수의 표준화 후 평균 f값은 %f이다.\033[0m\n", scalarAvg());
+        std::wprintf(L"\033[0;33m이 함수의 표준화 후 평균 f값은 %f이다.\033[0m\n", scalarSquareAvg());
     }
 
 
@@ -438,22 +438,13 @@ export struct Func
 
     double scalarAvg()
     {
-        //double totalVal = 0;
-        //for (int i = 0; i < myPoints.size(); i++)
-        //{
-        //    totalVal += scalar[{myPoints[i].x, myPoints[i].y, myPoints[i].z}];
-        //}
-
-        //return totalVal / (double)myPoints.size();
-
         double totalVal = 0;
         for (int i = 0; i < myPoints.size(); i++)
         {
-            double val = scalar[{myPoints[i].x, myPoints[i].y, myPoints[i].z}];
-            totalVal += val * val;
+            totalVal += scalar[{myPoints[i].x, myPoints[i].y, myPoints[i].z}];
         }
 
-        return std::sqrt(totalVal);
+        return totalVal / (double)myPoints.size();
     }
 
     double scalarL2Norm()

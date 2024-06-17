@@ -478,7 +478,7 @@ int main(int argc, char** argv)
 
                 ((Func*)funcSet[dataIndex])->translation(compX,compY,compZ);
                 ((Func*)funcSet[dataIndex])->scalarCalc();
-                std::wprintf(L"이 함수의 평균 f값은 %f이다.\n", ((Func*)funcSet[dataIndex])->scalarAvg());
+                std::wprintf(L"이 함수의 평균 f값은 %f이다.\n", ((Func*)funcSet[dataIndex])->scalarSquareAvg());
             }
 
             else if (input == 10)
@@ -580,7 +580,7 @@ int main(int argc, char** argv)
 
                 ((Func*)funcSet[dataIndex])->rotation(rotationMatrix);
                 ((Func*)funcSet[dataIndex])->scalarCalc();
-                std::wprintf(L"이 함수의 평균 f값은 %f이다.\n", ((Func*)funcSet[dataIndex])->scalarAvg());
+                std::wprintf(L"이 함수의 평균 f값은 %f이다.\n", ((Func*)funcSet[dataIndex])->scalarSquareAvg());
             }
 
             else if (input == 11) //cubic 스플라인 보간 실행
@@ -716,7 +716,8 @@ int main(int argc, char** argv)
                 for (int i = 0; i < ((Func*)funcSet[dataIndex])->myPoints.size(); i++)
                 {
                     Point pt = ((Func*)funcSet[dataIndex])->myPoints[i];
-                    std::wprintf(L"Index %d : {%.10f,%.10f,%.10f}\n", i, pt.x, pt.y, pt.z);
+                    //std::wprintf(L"Index %d : {%.10f,%.10f,%.10f}\n", i, pt.x, pt.y, pt.z);
+                    std::wprintf(L"%.10f,%.10f,%.10f\n", i, pt.x, pt.y, pt.z);
                 }
             }
             else if (input == 25) //데이터 표준화
@@ -949,7 +950,7 @@ int main(int argc, char** argv)
                     tgtFunc->scalarInfimum = -1.0;
                     tgtFunc->scalarSupremum = 1.0;
                     tgtFunc->scalarCalc();
-                    std::wprintf(L"이 함수의 평균 f값은 %f이다.\n", tgtFunc->scalarAvg());
+                    std::wprintf(L"이 함수의 평균 f값은 %f이다.\n", tgtFunc->scalarSquareAvg());
                 }
                 else std::wprintf(L"파일을 읽는데 실패하였습니다.\n");
             }

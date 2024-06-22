@@ -9,6 +9,7 @@ import std;
 export GLuint LoadTextTexture(const char* text, TTF_Font* font, SDL_Color textColor)
 {
     SDL_Surface* surface = TTF_RenderText_Blended(font, text, textColor);
+    if (!surface) return 0;
 
     GLuint textureID;
     glGenTextures(1, &textureID);
@@ -26,6 +27,11 @@ export GLuint LoadTextTexture(std::wstring text, TTF_Font* font, SDL_Color textC
     for (int i = 0; i < text.size(); i++) { unicode[i] = text[i]; }
     unicode[text.size()] = 0;
     SDL_Surface* surface = TTF_RenderUNICODE_Blended(font, unicode, textColor);//병목 1/3
+    if (!surface)
+    {
+        delete[] unicode;
+        return 0;
+    }
 
     GLuint textureID;
     glGenTextures(1, &textureID);
@@ -34,6 +40,7 @@ export GLuint LoadTextTexture(std::wstring text, TTF_Font* font, SDL_Color textC
     glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_MIN_FILTER, GL_LINEAR);
     glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_MAG_FILTER, GL_LINEAR);
     SDL_FreeSurface(surface);
+    delete[] unicode;
     return textureID;
 }
 
@@ -71,9 +78,14 @@ export void drawBillboardText(const std::string& text, TTF_Font* font, SDL_Color
 export void drawTextHUD(const std::string& text, TTF_Font* font, SDL_Color color, int x, int y)
 {
     GLuint textureID = LoadTextTexture(text.c_str(), font, color);
+    if (textureID == 0) return;
 
     int textWidth, textHeight;
-    TTF_SizeText(font, text.c_str(), &textWidth, &textHeight);
+    if (TTF_SizeText(font, text.c_str(), &textWidth, &textHeight) != 0) //텍스트 사이즈 계산 실패
+    {
+        glDeleteTextures(1, &textureID);
+        return;
+    }
 
     // 2D 투영 행렬 설정
     glMatrixMode(GL_PROJECTION);
@@ -107,13 +119,21 @@ export void drawTextHUD(const std::string& text, TTF_Font* font, SDL_Color color
 export void drawTextHUD(const std::wstring& text, TTF_Font* font, SDL_Color color, int x, int y)
 {
     GLuint textureID = LoadTextTexture(text.c_str(), font, color);
+    if (textureID == 0) return;
 
     int* w;
     int* h;
     int textWidth, textHeight;
     Uint16* unicode = new Uint16[text.size() + 1]();
     for (int i = 0; i < text.size(); i++) { unicode[i] = text[i]; }
-    TTF_SizeUNICODE(font, unicode, &textWidth, &textHeight);
+    unicode[text.size()] = 0; //마지막 널문자
+
+    if (TTF_SizeUNICODE(font, unicode, &textWidth, &textHeight) != 0) //텍스트 사이즈 계산 실패
+    {
+        delete[] unicode;
+        glDeleteTextures(1, &textureID);
+        return;
+    }
 
     // 2D 투영 행렬 설정
     glMatrixMode(GL_PROJECTION);
@@ -142,4 +162,6 @@ export void drawTextHUD(const std::wstring& text, TTF_Font* font, SDL_Color colo
     glMatrixMode(GL_MODELVIEW);
 
     glDeleteTextures(1, &textureID);
+
+    delete[] unicode;
 }

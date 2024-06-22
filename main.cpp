@@ -176,6 +176,11 @@ int main(int argc, char** argv)
             std::wprintf(L"26.PDE Solver\n");
             std::wprintf(L"27.LAMMPS Trajectory 파일 읽기(타임스텝 0)\n");
             std::wprintf(L"28.LAMMPS Trajectory 파일 읽기(모든 타임스텝)\n");
+
+            std::wprintf(L"\033[0;33m29.Make Translation Invariant (COM) \033[0m\n");
+            std::wprintf(L"\033[0;33m30.Define Lattice Constant \033[0m\n");
+            std::wprintf(L"\033[0;33m31.Crystal Structure Rotaiton \033[0m\n");
+            std::wprintf(L"\033[0;33m32.Crystal Structure Translation \033[0m\n");
             //std::wprintf(L"\033[37m");
             //std::wprintf(L"101.[Plumed] COLVAR : draw time-# Graph \n");
             //std::wprintf(L"102.[Plumed] COLVAR : draw time-biasPot Graph \n");
@@ -726,7 +731,7 @@ int main(int argc, char** argv)
                 std::wprintf(L"몇번째 데이터를 표준화시킬까? (0 ~ %d).\n", funcSet.size() - 1);
                 prtFuncName();
                 std::cin >> dataIndex;
-                ((Func*)funcSet[dataIndex])->normalize(GYROID_PERIOD);
+                ((Func*)funcSet[dataIndex])->invariablize(GYROID_PERIOD);
             }
             else if (input == 26)
             {
@@ -983,7 +988,7 @@ int main(int argc, char** argv)
                         {
                             readTrjString(str, 9, -1, 2, 3, 4, 1, atomType);
                             Func* tgtGyroid = ((Func*)funcSet[funcSet.size() - 1]);
-                            tgtGyroid->normalize(GYROID_PERIOD);
+                            tgtGyroid->invariablize(GYROID_PERIOD);
                             tgtGyroid->scalarCalc();
                             timeGraphFunc->myPoints.push_back({ (double)i,tgtGyroid->scalarSquareAvg(),0 });
                             delete tgtGyroid;
@@ -999,6 +1004,52 @@ int main(int argc, char** argv)
 
                     Func::hasTransform = false;
                 }
+            }
+            else if (input == 29)
+            {
+                int dataIndex = 0;
+                if (funcSet.size() > 1)
+                {
+                    std::wprintf(L"몇번째 데이터를 중앙정렬시킬까? (0 ~ %d).\n", funcSet.size() - 1);
+                    prtFuncName();
+                    std::cin >> dataIndex;
+                }
+                ((Func*)funcSet[dataIndex])->sortByCOM();
+            }
+            else if (input == 30)
+            {
+                int dataIndex = 0;
+                if (funcSet.size() > 1)
+                {
+                    std::wprintf(L"몇번째 데이터에 격자상수를 정의할까? (0 ~ %d).\n", funcSet.size() - 1);
+                    prtFuncName();
+                    std::cin >> dataIndex;
+                }
+                std::wprintf(L"격자상수의 값을 몇으로 할까?\n");
+                std::cin >> ((Func*)funcSet[dataIndex])->latticeConstant;
+                std::wprintf(L"격자상수 정의를 완료하였다. 현재 %d개의 입자가 결정구조 내에 존재한다.\n", ((Func*)funcSet[dataIndex])->countPointsWithinLattice());
+            }
+            else if (input == 31)
+            {
+                int dataIndex = 0;
+                if (funcSet.size() > 1)
+                {
+                    std::wprintf(L"몇번째 데이터의 결정구조를 회전시킬까?? (0 ~ %d).\n", funcSet.size() - 1);
+                    prtFuncName();
+                    std::cin >> dataIndex;
+                }
+                ((Func*)funcSet[dataIndex])->latticeRotation();
+            }
+            else if (input == 32)
+            {
+                int dataIndex = 0;
+                if (funcSet.size() > 1)
+                {
+                    std::wprintf(L"몇번째 데이터의 결정구조를 평행이동시킬까?? (0 ~ %d).\n", funcSet.size() - 1);
+                    prtFuncName();
+                    std::cin >> dataIndex;
+                }
+                ((Func*)funcSet[dataIndex])->latticeTranslation();
             }
             else std::wprintf(L"잘못된 값이 입력되었다.\n");
         }
@@ -1229,6 +1280,7 @@ int main(int argc, char** argv)
             }
         }
 
+
         //보간선 그리기 
         if (interLine)
         {
@@ -1247,6 +1299,82 @@ int main(int argc, char** argv)
                         glEnd();
                     }
                 }
+            }
+        }
+
+        //격자상수 경계 그리기
+        for (int dataIndex = 0; dataIndex < funcSet.size(); dataIndex++)
+        {
+            Func* tgtFunc = (Func*)funcSet[dataIndex];
+            if (tgtFunc->latticeConstant != 0)
+               {
+                // 라인 그리기
+                glBegin(GL_LINES);
+                glColor3f(0.0 / 256.0, 255.0 / 256.0, 255.0 / 256.0);
+
+                if (camFixMinusZ || camFixZ)
+                {
+                    glVertex3f(-tgtFunc->latticeConstant / 2.0, -tgtFunc->latticeConstant / 2.0, 0.0);
+                    glVertex3f(-tgtFunc->latticeConstant / 2.0, +tgtFunc->latticeConstant / 2.0, 0.0);
+                    glVertex3f(-tgtFunc->latticeConstant / 2.0, +tgtFunc->latticeConstant / 2.0, 0.0);
+                    glVertex3f(+tgtFunc->latticeConstant / 2.0, +tgtFunc->latticeConstant / 2.0, 0.0);
+                    glVertex3f(+tgtFunc->latticeConstant / 2.0, +tgtFunc->latticeConstant / 2.0, 0.0);
+                    glVertex3f(+tgtFunc->latticeConstant / 2.0, -tgtFunc->latticeConstant / 2.0, 0.0);
+                    glVertex3f(+tgtFunc->latticeConstant / 2.0, -tgtFunc->latticeConstant / 2.0, 0.0);
+                    glVertex3f(-tgtFunc->latticeConstant / 2.0, -tgtFunc->latticeConstant / 2.0, 0.0);
+                }
+                else if (camFixMinusX || camFixX)
+                {
+                    glVertex3f(0.0, -tgtFunc->latticeConstant / 2.0, -tgtFunc->latticeConstant / 2.0);
+                    glVertex3f(0.0, -tgtFunc->latticeConstant / 2.0, +tgtFunc->latticeConstant / 2.0);
+                    glVertex3f(0.0, -tgtFunc->latticeConstant / 2.0, +tgtFunc->latticeConstant / 2.0);
+                    glVertex3f(0.0, +tgtFunc->latticeConstant / 2.0, +tgtFunc->latticeConstant / 2.0);
+                    glVertex3f(0.0, +tgtFunc->latticeConstant / 2.0, +tgtFunc->latticeConstant / 2.0);
+                    glVertex3f(0.0, +tgtFunc->latticeConstant / 2.0, -tgtFunc->latticeConstant / 2.0);
+                    glVertex3f(0.0, +tgtFunc->latticeConstant / 2.0, -tgtFunc->latticeConstant / 2.0);
+                    glVertex3f(0.0, -tgtFunc->latticeConstant / 2.0, -tgtFunc->latticeConstant / 2.0);
+                }
+                else if (camFixMinusY || camFixY)
+                {
+                    glVertex3f(-tgtFunc->latticeConstant / 2.0, 0.0, -tgtFunc->latticeConstant / 2.0);
+                    glVertex3f(-tgtFunc->latticeConstant / 2.0, 0.0, +tgtFunc->latticeConstant / 2.0);
+                    glVertex3f(-tgtFunc->latticeConstant / 2.0, 0.0, +tgtFunc->latticeConstant / 2.0);
+                    glVertex3f(+tgtFunc->latticeConstant / 2.0, 0.0, +tgtFunc->latticeConstant / 2.0);
+                    glVertex3f(+tgtFunc->latticeConstant / 2.0, 0.0, +tgtFunc->latticeConstant / 2.0);
+                    glVertex3f(+tgtFunc->latticeConstant / 2.0, 0.0, -tgtFunc->latticeConstant / 2.0);
+                    glVertex3f(+tgtFunc->latticeConstant / 2.0, 0.0, -tgtFunc->latticeConstant / 2.0);
+                    glVertex3f(-tgtFunc->latticeConstant / 2.0, 0.0, -tgtFunc->latticeConstant / 2.0);
+                }
+                else
+                {
+                    glVertex3f(-tgtFunc->latticeConstant / 2.0, -tgtFunc->latticeConstant / 2.0, -tgtFunc->latticeConstant / 2.0);
+                    glVertex3f(-tgtFunc->latticeConstant / 2.0, +tgtFunc->latticeConstant / 2.0, -tgtFunc->latticeConstant / 2.0);
+                    glVertex3f(-tgtFunc->latticeConstant / 2.0, -tgtFunc->latticeConstant / 2.0, -tgtFunc->latticeConstant / 2.0);
+                    glVertex3f(-tgtFunc->latticeConstant / 2.0, -tgtFunc->latticeConstant / 2.0, +tgtFunc->latticeConstant / 2.0);
+                    glVertex3f(-tgtFunc->latticeConstant / 2.0, -tgtFunc->latticeConstant / 2.0, -tgtFunc->latticeConstant / 2.0);
+                    glVertex3f(+tgtFunc->latticeConstant / 2.0, -tgtFunc->latticeConstant / 2.0, -tgtFunc->latticeConstant / 2.0);
+                    glVertex3f(+tgtFunc->latticeConstant / 2.0, -tgtFunc->latticeConstant / 2.0, -tgtFunc->latticeConstant / 2.0);
+                    glVertex3f(+tgtFunc->latticeConstant / 2.0, -tgtFunc->latticeConstant / 2.0, +tgtFunc->latticeConstant / 2.0);
+                    glVertex3f(+tgtFunc->latticeConstant / 2.0, -tgtFunc->latticeConstant / 2.0, +tgtFunc->latticeConstant / 2.0);
+                    glVertex3f(-tgtFunc->latticeConstant / 2.0, -tgtFunc->latticeConstant / 2.0, +tgtFunc->latticeConstant / 2.0);
+                    glVertex3f(-tgtFunc->latticeConstant / 2.0, +tgtFunc->latticeConstant / 2.0, -tgtFunc->latticeConstant / 2.0);
+                    glVertex3f(+tgtFunc->latticeConstant / 2.0, +tgtFunc->latticeConstant / 2.0, -tgtFunc->latticeConstant / 2.0);
+                    glVertex3f(+tgtFunc->latticeConstant / 2.0, +tgtFunc->latticeConstant / 2.0, -tgtFunc->latticeConstant / 2.0);
+                    glVertex3f(+tgtFunc->latticeConstant / 2.0, +tgtFunc->latticeConstant / 2.0, +tgtFunc->latticeConstant / 2.0);
+                    glVertex3f(+tgtFunc->latticeConstant / 2.0, +tgtFunc->latticeConstant / 2.0, +tgtFunc->latticeConstant / 2.0);
+                    glVertex3f(-tgtFunc->latticeConstant / 2.0, +tgtFunc->latticeConstant / 2.0, +tgtFunc->latticeConstant / 2.0);
+                    glVertex3f(-tgtFunc->latticeConstant / 2.0, +tgtFunc->latticeConstant / 2.0, +tgtFunc->latticeConstant / 2.0);
+                    glVertex3f(-tgtFunc->latticeConstant / 2.0, +tgtFunc->latticeConstant / 2.0, -tgtFunc->latticeConstant / 2.0);
+                    glVertex3f(-tgtFunc->latticeConstant / 2.0, +tgtFunc->latticeConstant / 2.0, -tgtFunc->latticeConstant / 2.0);
+                    glVertex3f(-tgtFunc->latticeConstant / 2.0, -tgtFunc->latticeConstant / 2.0, -tgtFunc->latticeConstant / 2.0);
+                    glVertex3f(+tgtFunc->latticeConstant / 2.0, +tgtFunc->latticeConstant / 2.0, -tgtFunc->latticeConstant / 2.0);
+                    glVertex3f(+tgtFunc->latticeConstant / 2.0, -tgtFunc->latticeConstant / 2.0, -tgtFunc->latticeConstant / 2.0);
+                    glVertex3f(+tgtFunc->latticeConstant / 2.0, +tgtFunc->latticeConstant / 2.0, +tgtFunc->latticeConstant / 2.0);
+                    glVertex3f(+tgtFunc->latticeConstant / 2.0, -tgtFunc->latticeConstant / 2.0, +tgtFunc->latticeConstant / 2.0);
+                    glVertex3f(-tgtFunc->latticeConstant / 2.0, +tgtFunc->latticeConstant / 2.0, +tgtFunc->latticeConstant / 2.0);
+                    glVertex3f(-tgtFunc->latticeConstant / 2.0, -tgtFunc->latticeConstant / 2.0, +tgtFunc->latticeConstant / 2.0);
+                }
+                glEnd();
             }
         }
 

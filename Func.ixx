@@ -42,6 +42,8 @@ export struct Func
 
     std::function<double(double, double, double)> scalarFunc = [](double x, double y, double z)->double { return 0.0; };
 
+    double latticeConstant = 0;
+
     Func(funcFlag inputType) : funcType(inputType)
     {
         funcSet.push_back(this);
@@ -273,7 +275,7 @@ export struct Func
         }
     };
 
-    void normalize(double inputPeriod)
+    void invariablize(double inputPeriod)
     {
         std::wprintf(L"표준화 실행 전의 평균 f값은 %f이다.\n", scalarSquareAvg());
 
@@ -384,6 +386,7 @@ export struct Func
     }
 
 
+
     void rotation(Eigen::Matrix3d inputMat)
     {
         std::unordered_map<Point, double, decltype(pointHash)> newScalar;
@@ -470,6 +473,216 @@ export struct Func
 
         double meanVal = totalVal / (double)myPoints.size();
         return std::sqrt(meanVal);
+    }
+
+    int countPointsWithinLattice()
+    {
+        if (latticeConstant == 0)
+        {
+            std::wprintf(L"격자상수가 정의되어있지 않다.");
+            return 0;
+        }
+
+        int count = 0;
+        float halfLattice = latticeConstant / 2.0;
+
+        for (const auto& point : myPoints)
+        {
+            if (std::abs(point.x) <= halfLattice &&
+                std::abs(point.y) <= halfLattice &&
+                std::abs(point.z) <= halfLattice)
+            {
+                count++;
+            }
+        }
+
+        return count;
+    }
+
+    void eraseExternalLattice()
+    {
+        if (latticeConstant == 0)
+        {
+            std::wprintf(L"격자상수가 정의되어있지 않다.");
+            return;
+        }
+
+        int originNumber = countPointsWithinLattice();
+        auto it = std::remove_if(myPoints.begin(), myPoints.end(), [this](const Point& p) 
+            {
+            return std::abs(p.x) >= latticeConstant / 2.0 || std::abs(p.y) >= latticeConstant / 2.0 || std::abs(p.z) >= latticeConstant / 2.0;
+            }
+        );
+        myPoints.erase(it, myPoints.end());
+        std::wprintf(L"[eraseEternalCrystal] %d개의 입자가 제거되었다.\n", countPointsWithinLattice() - originNumber);
+    }
+
+    void latticeDuplicate()
+    {
+        if (latticeConstant == 0)
+        {
+            std::wprintf(L"격자상수가 정의되어있지 않다.");
+            return;
+        }
+
+        eraseExternalLattice();
+
+        std::vector<Point> newMyPoints;
+        for (const auto& point : myPoints)
+        {
+            for (int dx = -1; dx <= 1; dx++)
+            {
+                for (int dy = -1; dy <= 1; dy++)
+                {
+                    for (int dz = -1; dz <= 1; dz++)
+                    {
+                        Point newPoint;
+                        newPoint.x = point.x + dx * latticeConstant;
+                        newPoint.y = point.y + dy * latticeConstant;
+                        newPoint.z = point.z + dz * latticeConstant;
+                        newMyPoints.push_back(newPoint);
+                    }
+                }
+            }
+        }
+
+        myPoints = newMyPoints;
+    }
+
+    void latticeRotation()
+    {
+        if (latticeConstant == 0)
+        {
+            std::wprintf(L"격자상수가 정의되어있지 않다.");
+            return;
+        }
+        eraseExternalLattice();
+        latticeDuplicate();
+
+        double a11 = 1.0, a12 = 0.0, a13 = 0.0;
+        double a21 = 0.0, a22 = 1.0, a23 = 0.0;
+        double a31 = 0.0, a32 = 0.0, a33 = 1.0;
+
+        std::wprintf(L"Rotation Matrix의 a11 성분을 입력해주세요.\n", funcSet.size() - 1);
+        std::wprintf(L"{ ■, □, □ }\n");
+        std::wprintf(L"{ □, □, □ }\n");
+        std::wprintf(L"{ □, □, □ }\n");
+        std::cin >> a11;
+
+        std::wprintf(L"Rotation Matrix의 a12 성분을 입력해주세요.\n", funcSet.size() - 1);
+        std::wprintf(L"{ %f, ■, □ }\n", a11);
+        std::wprintf(L"{ □, □, □ }\n");
+        std::wprintf(L"{ □, □, □ }\n");
+        std::cin >> a12;
+
+        std::wprintf(L"Rotation Matrix의 a13 성분을 입력해주세요.\n");
+        std::wprintf(L"{ %f, %f, ■ }\n", a11, a12);
+        std::wprintf(L"{ □, □, □ }\n");
+        std::wprintf(L"{ □, □, □ }\n");
+        std::cin >> a13;
+
+        std::wprintf(L"Rotation Matrix의 a21 성분을 입력해주세요.\n");
+        std::wprintf(L"{ %f, %f, %f }\n", a11, a12, a13);
+        std::wprintf(L"{ ■, □, □ }\n");
+        std::wprintf(L"{ □, □, □ }\n");
+        std::cin >> a21;
+
+        std::wprintf(L"Rotation Matrix의 a22 성분을 입력해주세요.\n");
+        std::wprintf(L"{ %f, %f, %f }\n", a11, a12, a13);
+        std::wprintf(L"{ %f, ■, □ }\n", a21);
+        std::wprintf(L"{ □, □, □ }\n");
+        std::cin >> a22;
+
+        std::wprintf(L"Rotation Matrix의 a23 성분을 입력해주세요.\n");
+        std::wprintf(L"{ %f, %f, %f }\n", a11, a12, a13);
+        std::wprintf(L"{ %f, %f, ■ }\n", a21, a22);
+        std::wprintf(L"{ □, □, □ }\n");
+        std::cin >> a23;
+
+        std::wprintf(L"Rotation Matrix의 a31 성분을 입력해주세요.\n");
+        std::wprintf(L"{ %f, %f, %f }\n", a11, a12, a13);
+        std::wprintf(L"{ %f, %f, %f }\n", a21, a22, a23);
+        std::wprintf(L"{ ■, □, □ }\n");
+        std::cin >> a31;
+
+        std::wprintf(L"Rotation Matrix의 a32 성분을 입력해주세요.\n");
+        std::wprintf(L"{ %f, %f, %f }\n", a11, a12, a13);
+        std::wprintf(L"{ %f, %f, %f }\n", a21, a22, a23);
+        std::wprintf(L"{ %f, ■, □ }\n", a31);
+        std::cin >> a32;
+
+        std::wprintf(L"Rotation Matrix의 a33 성분을 입력해주세요.\n");
+        std::wprintf(L"{ %f, %f, %f }\n", a11, a12, a13);
+        std::wprintf(L"{ %f, %f, %f }\n", a21, a22, a23);
+        std::wprintf(L"{ %f, %f, ■ }\n", a31, a32);
+        std::cin >> a33;
+
+        Eigen::Matrix3d rotationMatrix;
+        rotationMatrix << a11, a12, a13,
+            a21, a22, a23,
+            a31, a32, a33;
+
+        rotation(rotationMatrix);
+        eraseExternalLattice();
+
+        std::wprintf(L"[latticeRotation] %d개의 입자가 결정구조 내에 존재한다.\n", countPointsWithinLattice());
+        scalarCalc();
+    }
+
+    void latticeTranslation()
+    {
+        if (latticeConstant == 0)
+        {
+            std::wprintf(L"격자상수가 정의되어있지 않다.");
+            return;
+        }
+        eraseExternalLattice();
+        latticeDuplicate();
+
+        double compX = 0, compY = 0, compZ = 0;
+        std::wprintf(L"Translation Vector의 x 성분을 입력해주세요.\n");
+        std::wprintf(L"Vector : { ■, □, □ }\n");
+        std::cin >> compX;
+        std::wprintf(L"Translation Vector의 y 성분을 입력해주세요.\n");
+        std::wprintf(L"Vector : { %f, ■, □ }\n", compX);
+        std::cin >> compY;
+        std::wprintf(L"Translation Vector의 z 성분을 입력해주세요.\n");
+        std::wprintf(L"Vector : { %f, %f, ■ }\n", compX, compY);
+        std::cin >> compZ;
+        std::wprintf(L"다음 벡터로 tranlsation을 진행합니다.\n");
+        std::wprintf(L"Vector : { %f, %f, %f }\n", compX, compY, compZ);
+
+        translation(compX, compY, compZ);
+        eraseExternalLattice();
+
+        std::wprintf(L"[latticeTranslation] %d개의 입자가 결정구조 내에 존재한다.\n", countPointsWithinLattice());
+        scalarCalc();
+    }
+
+    void sortByCOM()
+    {
+        //중심점 계산
+        double totalX = 0, totalY = 0, totalZ = 0;
+        for (const auto& point : myPoints)
+        {
+            totalX += point.x;
+            totalY += point.y;
+            totalZ += point.z;
+        }
+        double centerX = totalX / myPoints.size();
+        double centerY = totalY / myPoints.size();
+        double centerZ = totalZ / myPoints.size();
+
+
+        //데이터를 원점을 기준으로 변경
+        for (int i = 0; i < myPoints.size(); i++)
+        {
+            myPoints[i].x -= centerX;
+            myPoints[i].y -= centerY;
+            myPoints[i].z -= centerZ;
+        }
+
+        scalarCalc();
     }
 };
 

@@ -35,6 +35,9 @@ export struct Func
     bool triFirstRun = true;
 
     inline static bool hasTransform = false;
+    
+    inline static bool hasTranslation = false;
+    inline static bool hasRotation = false;
     inline static Eigen::Vector3d transVec;
     inline static Eigen::Matrix3d rotMat;
 
@@ -501,6 +504,7 @@ export struct Func
 
     void eraseExternalLattice()
     {
+        std::wprintf(L"격자상수 외부의 원자들을 전부 제거합니다.");
         if (latticeConstant == 0)
         {
             std::wprintf(L"격자상수가 정의되어있지 않다.");
@@ -519,6 +523,7 @@ export struct Func
 
     void latticeDuplicate()
     {
+        std::wprintf(L"주변 26개의 결정구조 복사를 시작합니다.");
         if (latticeConstant == 0)
         {
             std::wprintf(L"격자상수가 정의되어있지 않다.");
@@ -551,6 +556,7 @@ export struct Func
 
     void latticeRotation()
     {
+        std::wprintf(L"결정구조 회전을 시작합니다.");
         if (latticeConstant == 0)
         {
             std::wprintf(L"격자상수가 정의되어있지 않다.");
@@ -627,13 +633,15 @@ export struct Func
 
         std::wprintf(L"[latticeRotation] %d개의 입자가 결정구조 내에 존재한다.\n", countPointsWithinLattice());
         scalarCalc();
+        std::wprintf(L"\033[0;33m이 함수의 평균 f값은 %f이다.\033[0m\n", scalarSquareAvg());
     }
 
     void latticeTranslation()
     {
+        std::wprintf(L"결정구조 평행이동을 시작합니다.");
         if (latticeConstant == 0)
         {
-            std::wprintf(L"격자상수가 정의되어있지 않다.");
+            std::wprintf(L"[Error] 격자상수가 정의되어있지 않다.");
             return;
         }
         eraseExternalLattice();
@@ -657,32 +665,160 @@ export struct Func
 
         std::wprintf(L"[latticeTranslation] %d개의 입자가 결정구조 내에 존재한다.\n", countPointsWithinLattice());
         scalarCalc();
+        std::wprintf(L"\033[0;33m이 함수의 평균 f값은 %f이다.\033[0m\n", scalarSquareAvg());
     }
 
     void sortByCOM()
     {
-        //중심점 계산
-        double totalX = 0, totalY = 0, totalZ = 0;
-        for (const auto& point : myPoints)
+        std::wprintf(L"COM을 이용하여 중앙정렬을 시작합니다.");
+        if (hasTranslation == false)
         {
-            totalX += point.x;
-            totalY += point.y;
-            totalZ += point.z;
+            //중심점 계산
+            double totalX = 0, totalY = 0, totalZ = 0;
+            for (const auto& point : myPoints)
+            {
+                totalX += point.x;
+                totalY += point.y;
+                totalZ += point.z;
+            }
+            double centerX = totalX / myPoints.size();
+            double centerY = totalY / myPoints.size();
+            double centerZ = totalZ / myPoints.size();
+
+
+            //데이터를 원점을 기준으로 변경
+            for (int i = 0; i < myPoints.size(); i++)
+            {
+                myPoints[i].x -= centerX;
+                myPoints[i].y -= centerY;
+                myPoints[i].z -= centerZ;
+            }
+            
+            transVec = { -centerX, -centerY, -centerZ };
+            hasTranslation = true;
         }
-        double centerX = totalX / myPoints.size();
-        double centerY = totalY / myPoints.size();
-        double centerZ = totalZ / myPoints.size();
-
-
-        //데이터를 원점을 기준으로 변경
-        for (int i = 0; i < myPoints.size(); i++)
+        else
         {
-            myPoints[i].x -= centerX;
-            myPoints[i].y -= centerY;
-            myPoints[i].z -= centerZ;
+            for (int i = 0; i < myPoints.size(); i++)
+            {
+                myPoints[i].x += transVec[0];
+                myPoints[i].y += transVec[1];
+                myPoints[i].z += transVec[2];
+            }
         }
 
         scalarCalc();
+
+        std::cout << "\n평행이동 벡터" << ":\n" << transVec << "\n\n";
+        std::wprintf(L"\033[0;33m이 함수의 평균 f값은 %f이다.\033[0m\n", scalarSquareAvg());
+    }
+
+    void sortByPCA()
+    {
+        std::wprintf(L"PCA를 이용하여 회전정렬을 시작합니다.");
+        if (latticeConstant == 0)
+        {
+            std::wprintf(L"[Error] 격자상수가 정의되지 않은 상태에서 PCA를 실행했다.\n");
+            return;
+        }
+
+        if (1)//(hasRotation == false )
+        {
+
+
+            std::vector<Point> testPoints;
+            auto isInSphere = [](Point inputP, double rad, double cx, double cy, double cz)->bool
+                {
+                    double dx = inputP.x - cx;
+                    double dy = inputP.y - cy;
+                    double dz = inputP.z - cz;
+                    double distanceSquared = dx * dx + dy * dy + dz * dz;
+                    return distanceSquared <= rad * rad;
+                };
+            
+            for (int i = 0; i < myPoints.size(); i++)
+            {
+                if (isInSphere(myPoints[i], latticeConstant / 2.0, 0, 0, 0))
+                {
+                    testPoints.push_back(myPoints[i]);
+                    std::wprintf(L"구 내부의 점 (%f,%f,%f)를 컨테이너에 넣었다.\n",myPoints[i].x, myPoints[i].y, myPoints[i].z);
+                }
+            }
+            std::wprintf(L"구 내부의 점들은 총 %d개이다.\n", testPoints.size());
+
+
+            Eigen::MatrixXd matX;
+            matX.resize(testPoints.size(), 3);
+            for (int row = 0; row < testPoints.size(); row++)
+            {
+                matX(row, 0) = testPoints[row].x;
+                matX(row, 1) = testPoints[row].y;
+                matX(row, 2) = testPoints[row].z;
+            }
+
+            Eigen::MatrixXd matXT = matX.transpose();
+            Eigen::MatrixXd matCov = (1.0 / (double)testPoints.size()) * (matXT * matX);
+
+            Eigen::SelfAdjointEigenSolver<Eigen::MatrixXd> solver(matCov);
+            Eigen::VectorXd eigenvalues = solver.eigenvalues();
+            Eigen::MatrixXd eigenvectors = solver.eigenvectors();
+
+            std::cout << "Eigenvalues " << ":\n" << eigenvalues << "\n\n";
+            for (int i = 0; i < eigenvectors.cols(); ++i)
+            {
+                std::cout << "Eigenvector " << i + 1 << ":\n" << eigenvectors.col(i) << "\n\n";
+            }
+
+            double maxVal = eigenvalues[0];
+            int maxIndex = 0;
+
+            for (int i = 1; i < eigenvalues.size(); ++i)
+            {
+                double currentVal = eigenvalues[i];
+                if (currentVal > maxVal)
+                {
+                    maxVal = currentVal;
+                    maxIndex = i;
+                }
+            }
+
+            Eigen::Matrix3d tgtMat;
+            tgtMat = eigenvectors;
+
+            Eigen::Matrix3d originMat;
+            originMat << 0.859311, 0.485435, 0.161053,
+                0.417805, -0.484633, -0.768485,
+                0.294998, -0.727656, 0.619268;
+
+            Eigen::Matrix3d rotationMat = originMat * tgtMat.inverse();
+
+            hasRotation = true;
+            rotMat = rotationMat;
+        }
+        else
+        {
+        }
+
+        latticeDuplicate();
+        rotation(rotMat);
+        eraseExternalLattice();
+        
+        std::cout << "\n회전행렬 " << ":\n" << rotMat << "\n\n";
+        {
+            Eigen::Matrix3d checkMat = rotMat;
+            double trace = checkMat.trace();
+            double theta = std::acos((trace - 1) / 2);
+            Eigen::Vector3d axis;
+            axis << checkMat(2, 1) - checkMat(1, 2),
+                checkMat(0, 2) - checkMat(2, 0),
+                checkMat(1, 0) - checkMat(0, 1);
+            axis.normalize();
+            std::cout << "회전각 : " << theta * 180.0 / M_PI << std::endl;
+            std::cout << "회전축: (" << axis.x() << ", " << axis.y() << ", " << axis.z() << ")" << std::endl;
+        }
+
+        scalarCalc();
+        std::wprintf(L"\033[0;33m이 함수의 평균 f값은 %f이다.\033[0m\n", scalarSquareAvg());
     }
 };
 

@@ -178,10 +178,11 @@ int main(int argc, char** argv)
             std::wprintf(L"27.LAMMPS Trajectory 파일 읽기(타임스텝 0)\n");
             std::wprintf(L"28.LAMMPS Trajectory 파일 읽기(모든 타임스텝)\n");
 
-            std::wprintf(L"\033[0;33m29.Make Translation Invariant (COM) \033[0m\n");
+            std::wprintf(L"\033[0;33m29.Sort by COM \033[0m\n");
             std::wprintf(L"\033[0;33m30.Define Lattice Constant \033[0m\n");
             std::wprintf(L"\033[0;33m31.Crystal Structure Rotaiton \033[0m\n");
             std::wprintf(L"\033[0;33m32.Crystal Structure Translation \033[0m\n");
+            std::wprintf(L"\033[0;33m33.Sort by PCA \033[0m\n");
             //std::wprintf(L"\033[37m");
             //std::wprintf(L"101.[Plumed] COLVAR : draw time-# Graph \n");
             //std::wprintf(L"102.[Plumed] COLVAR : draw time-biasPot Graph \n");
@@ -1026,7 +1027,7 @@ int main(int argc, char** argv)
                     prtFuncName();
                     std::cin >> dataIndex;
                 }
-                std::wprintf(L"격자상수의 값을 몇으로 할까?\n");
+                std::wprintf(L"격자상수의 값을 몇으로 할까? (기본 10.849215)\n");
                 std::cin >> ((Func*)funcSet[dataIndex])->latticeConstant;
                 std::wprintf(L"격자상수 정의를 완료하였다. 현재 %d개의 입자가 결정구조 내에 존재한다.\n", ((Func*)funcSet[dataIndex])->countPointsWithinLattice());
             }
@@ -1051,6 +1052,17 @@ int main(int argc, char** argv)
                     std::cin >> dataIndex;
                 }
                 ((Func*)funcSet[dataIndex])->latticeTranslation();
+            }
+            else if (input == 33)
+            {
+                int dataIndex = 0;
+                if (funcSet.size() > 1)
+                {
+                    std::wprintf(L"몇번째 데이터를 회전정렬시킬까? (0 ~ %d).\n", funcSet.size() - 1);
+                    prtFuncName();
+                    std::cin >> dataIndex;
+                }
+                ((Func*)funcSet[dataIndex])->sortByPCA();
             }
             else std::wprintf(L"잘못된 값이 입력되었다.\n");
         }

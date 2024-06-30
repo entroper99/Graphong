@@ -183,6 +183,7 @@ int main(int argc, char** argv)
             std::wprintf(L"\033[0;33m31.Crystal Structure Rotaiton \033[0m\n");
             std::wprintf(L"\033[0;33m32.Crystal Structure Translation \033[0m\n");
             std::wprintf(L"\033[0;33m33.Sort by PCA \033[0m\n");
+            std::wprintf(L"\033[0;33m34.연속평행이동 \033[0m\n");
             //std::wprintf(L"\033[37m");
             //std::wprintf(L"101.[Plumed] COLVAR : draw time-# Graph \n");
             //std::wprintf(L"102.[Plumed] COLVAR : draw time-biasPot Graph \n");
@@ -630,16 +631,20 @@ int main(int argc, char** argv)
             }
             else if (input == 12)
             {
-                if (interLine == false)
+                int dataIndex = 0;
+                if (funcSet.size() > 1)
                 {
-                    std::wprintf(L"보간값들을 직선으로 연결하였다.\n");
-                    interLine = true;
+                    std::wprintf(L"몇번째 데이터를 선형으로 연결할까? (0 ~ %d).\n", funcSet.size() - 1);
+                    prtFuncName();
+                    std::cin >> dataIndex;
                 }
-                else
+                Func* tgtFunc = (Func*)funcSet[dataIndex];
+                if (tgtFunc->myInterPoints.size() == 0)
                 {
-                    std::wprintf(L"보간값들의 직선을 화면에서 숨겼다.\n");
-                    interLine = false;
+                    tgtFunc->myInterPoints = tgtFunc->myPoints;
                 }
+                tgtFunc->interLine = true;
+                std::wprintf(L"보간값들을 직선으로 연결하였다.\n");
             }
             else if (input == 17)
             {
@@ -684,35 +689,33 @@ int main(int argc, char** argv)
                 Func* targetFunc = new Func(funcFlag::scalarField);
                 int numPoints = 40; // 공간에 존재하는 점의 수, 많을수록 정확해짐
                 double spacing = (2.0 * M_PI) / numPoints; //사이의 공간, 전부 더하면 부피가 됨
-                targetFunc->scalarFunc = [](double x, double y, double z)->double
+                double length = 1.0;
+                double scaleFactor = 2.0 * M_PI / length;
+                targetFunc->scalarFunc = [=](double x, double y, double z)->double
                     {
-                        return std::sqrt(8.0 / 3.0) * (std::cos(x - M_PI) * std::sin(y - M_PI) * std::sin(2 * (z - M_PI)) + std::cos(y - M_PI) * std::sin(z - M_PI) * std::sin(2 * (x - M_PI)) + std::cos(z - M_PI) * std::sin(x - M_PI) * std::sin(2 * (y - M_PI)));
+                        return (std::cos(scaleFactor * x) * std::sin(scaleFactor * y) * std::sin(2 * (scaleFactor * z)) + std::cos(scaleFactor * y) * std::sin(scaleFactor * z) * std::sin(2 * (scaleFactor * x)) + std::cos(scaleFactor * z) * std::sin(scaleFactor * x) * std::sin(2 * (scaleFactor * y)));
                     };
 
-                targetFunc->scalarInfimum = -2.0;// * std::sqrt(2);
-                targetFunc->scalarSupremum = 2.0;// *std::sqrt(2);
+                targetFunc->scalarInfimum = -1.0;// * std::sqrt(2);
+                targetFunc->scalarSupremum = 1.0;// *std::sqrt(2);
 
-                for (int i = -numPoints/2; i < numPoints/2; ++i)
+                for (double i = -0.5; i <= 0.5; i += 0.05)
                 {
-                    for (int j = -numPoints/2; j < numPoints/2; ++j)
+                    for (double j = -0.5; j <= 0.5; j += 0.05)
                     {
-                        for (int k = -numPoints/2; k < numPoints/2; ++k)
+                        for (double k = -0.5; k <= 0.5; k += 0.05)
                         {
-                            double x = i * spacing;
-                            double y = j * spacing;
-                            double z = k * spacing;
-                            double value = std::sqrt(8.0 / 3.0) * (std::cos(x - M_PI) * std::sin(y - M_PI) * std::sin(2 * (z - M_PI)) + std::cos(y - M_PI) * std::sin(z - M_PI) * std::sin(2 * (x - M_PI)) + std::cos(z - M_PI) * std::sin(x - M_PI) * std::sin(2 * (y - M_PI)));
+                            double x = i;
+                            double y = j;
+                            double z = k;
                             double cutoff = 1.0; //이 값 이상의 자이로이드만 화면에 표시됨
-                            if (1)//(value >= cutoff)
-                            {
-                                targetFunc->myPoints.push_back({ x, y, z });
-                                targetFunc->scalar[{x, y, z}] = value;
-                                //std::wprintf(L"데이터 {%f,%f,%f}의 val값은 %f이다.\n", x, y, z, value);
-                            }
+                            targetFunc->myPoints.push_back({ x, y, z });
                             //std::wprintf(L"데이터 {%f,%f,%f}를 함수 %d에 입력했다.\n", x, y, z, funcSet.size() - 1);
                         }
                     }
                 }
+
+                targetFunc->scalarCalc();
             }
             else if (input == 24)
             {
@@ -930,7 +933,7 @@ int main(int argc, char** argv)
                 }
                 std::wprintf(L"모든 계산이 완료되었다.\n");
             }
-            else if (input == 27)//trajectory 읽기
+            else if (input == 27)//단일 trajectory 읽기
             {
                 std::wstring file = L"";
                 std::wprintf(L"데이터가 있는 파일을 선택해주세요.\n");
@@ -946,7 +949,7 @@ int main(int argc, char** argv)
                     //tgtFunc->myPoints.clear();
                     //orthogonal box = (-0.111315 -0.111315 -0.111315) to (10.7379 10.7379 10.7379)
                     //따라서 한변의 지름은 10.7379 - (-0.111315) = 10.849215
-                    double length = GYROID_PERIOD;
+                    double length = 0.5;//GYROID_PERIOD;
                     double scaleFactor = 2.0 * M_PI / length;
 
                     tgtFunc->scalarFunc = [=](double x, double y, double z)->double
@@ -957,6 +960,8 @@ int main(int argc, char** argv)
                     tgtFunc->scalarInfimum = -1.0;
                     tgtFunc->scalarSupremum = 1.0;
                     tgtFunc->scalarCalc();
+                    tgtFunc->latticeConstant = GYROID_PERIOD;
+                    tgtFunc->translation(-10.849215/2.0, -10.849215 / 2.0, -10.849215 / 2.0);
                     std::wprintf(L"이 함수의 평균 f값은 %f이다.\n", tgtFunc->scalarSquareAvg());
                 }
                 else std::wprintf(L"파일을 읽는데 실패하였습니다.\n");
@@ -1040,7 +1045,71 @@ int main(int argc, char** argv)
                     prtFuncName();
                     std::cin >> dataIndex;
                 }
-                ((Func*)funcSet[dataIndex])->latticeRotation();
+
+                double a11 = 1.0, a12 = 0.0, a13 = 0.0;
+                double a21 = 0.0, a22 = 1.0, a23 = 0.0;
+                double a31 = 0.0, a32 = 0.0, a33 = 1.0;
+
+                std::wprintf(L"Rotation Matrix의 a11 성분을 입력해주세요.\n", funcSet.size() - 1);
+                std::wprintf(L"{ ■, □, □ }\n");
+                std::wprintf(L"{ □, □, □ }\n");
+                std::wprintf(L"{ □, □, □ }\n");
+                std::cin >> a11;
+
+                std::wprintf(L"Rotation Matrix의 a12 성분을 입력해주세요.\n", funcSet.size() - 1);
+                std::wprintf(L"{ %f, ■, □ }\n", a11);
+                std::wprintf(L"{ □, □, □ }\n");
+                std::wprintf(L"{ □, □, □ }\n");
+                std::cin >> a12;
+
+                std::wprintf(L"Rotation Matrix의 a13 성분을 입력해주세요.\n");
+                std::wprintf(L"{ %f, %f, ■ }\n", a11, a12);
+                std::wprintf(L"{ □, □, □ }\n");
+                std::wprintf(L"{ □, □, □ }\n");
+                std::cin >> a13;
+
+                std::wprintf(L"Rotation Matrix의 a21 성분을 입력해주세요.\n");
+                std::wprintf(L"{ %f, %f, %f }\n", a11, a12, a13);
+                std::wprintf(L"{ ■, □, □ }\n");
+                std::wprintf(L"{ □, □, □ }\n");
+                std::cin >> a21;
+
+                std::wprintf(L"Rotation Matrix의 a22 성분을 입력해주세요.\n");
+                std::wprintf(L"{ %f, %f, %f }\n", a11, a12, a13);
+                std::wprintf(L"{ %f, ■, □ }\n", a21);
+                std::wprintf(L"{ □, □, □ }\n");
+                std::cin >> a22;
+
+                std::wprintf(L"Rotation Matrix의 a23 성분을 입력해주세요.\n");
+                std::wprintf(L"{ %f, %f, %f }\n", a11, a12, a13);
+                std::wprintf(L"{ %f, %f, ■ }\n", a21, a22);
+                std::wprintf(L"{ □, □, □ }\n");
+                std::cin >> a23;
+
+                std::wprintf(L"Rotation Matrix의 a31 성분을 입력해주세요.\n");
+                std::wprintf(L"{ %f, %f, %f }\n", a11, a12, a13);
+                std::wprintf(L"{ %f, %f, %f }\n", a21, a22, a23);
+                std::wprintf(L"{ ■, □, □ }\n");
+                std::cin >> a31;
+
+                std::wprintf(L"Rotation Matrix의 a32 성분을 입력해주세요.\n");
+                std::wprintf(L"{ %f, %f, %f }\n", a11, a12, a13);
+                std::wprintf(L"{ %f, %f, %f }\n", a21, a22, a23);
+                std::wprintf(L"{ %f, ■, □ }\n", a31);
+                std::cin >> a32;
+
+                std::wprintf(L"Rotation Matrix의 a33 성분을 입력해주세요.\n");
+                std::wprintf(L"{ %f, %f, %f }\n", a11, a12, a13);
+                std::wprintf(L"{ %f, %f, %f }\n", a21, a22, a23);
+                std::wprintf(L"{ %f, %f, ■ }\n", a31, a32);
+                std::cin >> a33;
+
+                Eigen::Matrix3d inputMatrix;
+                inputMatrix << a11, a12, a13,
+                    a21, a22, a23,
+                    a31, a32, a33;
+
+                ((Func*)funcSet[dataIndex])->latticeRotation(inputMatrix);
             }
             else if (input == 32)
             {
@@ -1051,7 +1120,21 @@ int main(int argc, char** argv)
                     prtFuncName();
                     std::cin >> dataIndex;
                 }
-                ((Func*)funcSet[dataIndex])->latticeTranslation();
+
+                double compX = 0, compY = 0, compZ = 0;
+                std::wprintf(L"Translation Vector의 x 성분을 입력해주세요.\n");
+                std::wprintf(L"Vector : { ■, □, □ }\n");
+                std::cin >> compX;
+                std::wprintf(L"Translation Vector의 y 성분을 입력해주세요.\n");
+                std::wprintf(L"Vector : { %f, ■, □ }\n", compX);
+                std::cin >> compY;
+                std::wprintf(L"Translation Vector의 z 성분을 입력해주세요.\n");
+                std::wprintf(L"Vector : { %f, %f, ■ }\n", compX, compY);
+                std::cin >> compZ;
+                std::wprintf(L"다음 벡터로 tranlsation을 진행합니다.\n");
+                std::wprintf(L"Vector : { %f, %f, %f }\n", compX, compY, compZ);
+
+                ((Func*)funcSet[dataIndex])->latticeTranslation(compX, compY, compZ);
             }
             else if (input == 33)
             {
@@ -1063,6 +1146,43 @@ int main(int argc, char** argv)
                     std::cin >> dataIndex;
                 }
                 ((Func*)funcSet[dataIndex])->sortByPCA();
+            }
+            else if (input == 34)//평행이동 자동화
+            {
+
+                int dataIndex = 0;
+                if (funcSet.size() > 1)
+                {
+                    std::wprintf(L"몇번째 데이터에 연속 평행이동을 할까? (0 ~ %d).\n", funcSet.size() - 1);
+                    prtFuncName();
+                    std::cin >> dataIndex;
+                }
+                double del, max;
+                std::wprintf(L"데이터의 평행이동 간격을 몇으로 할까?\n");
+                std::cin >> del;
+                std::wprintf(L"데이터의 최대 평행이동 값을 몇으로 할까?\n");
+                std::cin >> max;
+
+                std::vector<std::array<double, 2>> result;
+                for (double i = 0; i < max; i += del)
+                {
+                    ((Func*)funcSet[dataIndex])->latticeTranslation(del, 0, 0);
+                    result.push_back({ i,((Func*)funcSet[dataIndex])->scalarAvg() });
+                }
+
+                for (int i = 0; i < result.size(); i++)
+                {
+                    std::wprintf(L"%f, %f\n", result[i][0], result[i][1]);
+                }
+
+                for (int i = funcSet.size()-1; i >= 0; i--)
+                {
+                    delete (Func*)funcSet[i];
+                }
+                funcSet.clear();
+
+                Func* tgtFunc = new Func(funcFlag::dim2);
+                for (int i = 0; i < result.size(); i++) tgtFunc->myPoints.push_back({ result[i][0], result[i][1] });
             }
             else std::wprintf(L"잘못된 값이 입력되었다.\n");
         }
@@ -1295,11 +1415,11 @@ int main(int argc, char** argv)
 
 
         //보간선 그리기 
-        if (interLine)
+        for (int dataIndex = 0; dataIndex < funcSet.size(); dataIndex++)
         {
-            for (int dataIndex = 0; dataIndex < funcSet.size(); dataIndex++)
+            Func* tgtFunc = (Func*)funcSet[dataIndex];
+            if (tgtFunc->interLine == true)
             {
-                Func* tgtFunc = (Func*)funcSet[dataIndex];
                 if (tgtFunc->myInterPoints.size() >= 2)
                 {
                     for (int i = 0; i < tgtFunc->myInterPoints.size() - 1; i++)

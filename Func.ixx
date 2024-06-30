@@ -42,12 +42,13 @@ export struct Func
     inline static Eigen::Matrix3d rotMat;
 
     double period = 0.0;
+    bool interLine = false;
 
-    std::function<double(double, double, double)> scalarFunc = [](double x, double y, double z)->double { return 0.0; };
+    std::function<double(double, double, double)> scalarFunc;
 
     double latticeConstant = 0;
 
-    Func(funcFlag inputType) : funcType(inputType)
+    Func(funcFlag inputType) : funcType(inputType) , scalarFunc([](double x, double y, double z) -> double { return 0.0; })
     {
         funcSet.push_back(this);
     };
@@ -283,12 +284,13 @@ export struct Func
         std::wprintf(L"표준화 실행 전의 평균 f값은 %f이다.\n", scalarSquareAvg());
 
         //고유 스칼라 함수 변경
-        period = inputPeriod;
-        double scaleFactor = 2.0 * M_PI / period;
-        scalarFunc = [=](double x, double y, double z)->double
-            {
-                return (std::cos(scaleFactor * x) * std::sin(scaleFactor * y) * std::sin(2 * (scaleFactor * z)) + std::cos(scaleFactor * y) * std::sin(scaleFactor * z) * std::sin(2 * (scaleFactor * x)) + std::cos(scaleFactor * z) * std::sin(scaleFactor * x) * std::sin(2 * (scaleFactor * y)));
-            };
+        // 
+        //period = inputPeriod;
+        //double scaleFactor = 2.0 * M_PI / period;
+        //scalarFunc = [=](double x, double y, double z)->double
+        //    {
+        //        return (std::cos(scaleFactor * x) * std::sin(scaleFactor * y) * std::sin(2 * (scaleFactor * z)) + std::cos(scaleFactor * y) * std::sin(scaleFactor * z) * std::sin(2 * (scaleFactor * x)) + std::cos(scaleFactor * z) * std::sin(scaleFactor * x) * std::sin(2 * (scaleFactor * y)));
+        //    };
 
 
         if (hasTransform == false)
@@ -387,8 +389,6 @@ export struct Func
         std::wprintf(L"표준화를 완료하였다.\n");
         std::wprintf(L"\033[0;33m이 함수의 표준화 후 평균 f값은 %f이다.\033[0m\n", scalarSquareAvg());
     }
-
-
 
     void rotation(Eigen::Matrix3d inputMat)
     {
@@ -504,29 +504,30 @@ export struct Func
 
     void eraseExternalLattice()
     {
-        std::wprintf(L"격자상수 외부의 원자들을 전부 제거합니다.");
+        //std::wprintf(L"격자상수 외부의 원자들을 전부 제거합니다.\n");
         if (latticeConstant == 0)
         {
-            std::wprintf(L"격자상수가 정의되어있지 않다.");
+            std::wprintf(L"[Error] 격자상수가 정의되어있지 않다.\n");
             return;
         }
 
-        int originNumber = countPointsWithinLattice();
+        int originNumber = myPoints.size();
+
         auto it = std::remove_if(myPoints.begin(), myPoints.end(), [this](const Point& p) 
             {
-            return std::abs(p.x) >= latticeConstant / 2.0 || std::abs(p.y) >= latticeConstant / 2.0 || std::abs(p.z) >= latticeConstant / 2.0;
+            return std::abs(p.x) > latticeConstant / 2.0 || std::abs(p.y) > latticeConstant / 2.0 || std::abs(p.z) > latticeConstant / 2.0;
             }
         );
         myPoints.erase(it, myPoints.end());
-        std::wprintf(L"[eraseEternalCrystal] %d개의 입자가 제거되었다.\n", countPointsWithinLattice() - originNumber);
+        //std::wprintf(L"[eraseEternalCrystal] %d개의 입자가 제거되었다.\n",  originNumber - countPointsWithinLattice());
     }
 
     void latticeDuplicate()
     {
-        std::wprintf(L"주변 26개의 결정구조 복사를 시작합니다.");
+        //std::wprintf(L"주변 26개의 결정구조 복사를 시작합니다.\n");
         if (latticeConstant == 0)
         {
-            std::wprintf(L"격자상수가 정의되어있지 않다.");
+            std::wprintf(L"[Error] 격자상수가 정의되어있지 않다.\n");
             return;
         }
 
@@ -554,9 +555,9 @@ export struct Func
         myPoints = newMyPoints;
     }
 
-    void latticeRotation()
+    void latticeRotation(Eigen::Matrix3d inputMatrix)
     {
-        std::wprintf(L"결정구조 회전을 시작합니다.");
+        //std::wprintf(L"결정구조 회전을 시작합니다.");
         if (latticeConstant == 0)
         {
             std::wprintf(L"격자상수가 정의되어있지 않다.");
@@ -565,80 +566,18 @@ export struct Func
         eraseExternalLattice();
         latticeDuplicate();
 
-        double a11 = 1.0, a12 = 0.0, a13 = 0.0;
-        double a21 = 0.0, a22 = 1.0, a23 = 0.0;
-        double a31 = 0.0, a32 = 0.0, a33 = 1.0;
-
-        std::wprintf(L"Rotation Matrix의 a11 성분을 입력해주세요.\n", funcSet.size() - 1);
-        std::wprintf(L"{ ■, □, □ }\n");
-        std::wprintf(L"{ □, □, □ }\n");
-        std::wprintf(L"{ □, □, □ }\n");
-        std::cin >> a11;
-
-        std::wprintf(L"Rotation Matrix의 a12 성분을 입력해주세요.\n", funcSet.size() - 1);
-        std::wprintf(L"{ %f, ■, □ }\n", a11);
-        std::wprintf(L"{ □, □, □ }\n");
-        std::wprintf(L"{ □, □, □ }\n");
-        std::cin >> a12;
-
-        std::wprintf(L"Rotation Matrix의 a13 성분을 입력해주세요.\n");
-        std::wprintf(L"{ %f, %f, ■ }\n", a11, a12);
-        std::wprintf(L"{ □, □, □ }\n");
-        std::wprintf(L"{ □, □, □ }\n");
-        std::cin >> a13;
-
-        std::wprintf(L"Rotation Matrix의 a21 성분을 입력해주세요.\n");
-        std::wprintf(L"{ %f, %f, %f }\n", a11, a12, a13);
-        std::wprintf(L"{ ■, □, □ }\n");
-        std::wprintf(L"{ □, □, □ }\n");
-        std::cin >> a21;
-
-        std::wprintf(L"Rotation Matrix의 a22 성분을 입력해주세요.\n");
-        std::wprintf(L"{ %f, %f, %f }\n", a11, a12, a13);
-        std::wprintf(L"{ %f, ■, □ }\n", a21);
-        std::wprintf(L"{ □, □, □ }\n");
-        std::cin >> a22;
-
-        std::wprintf(L"Rotation Matrix의 a23 성분을 입력해주세요.\n");
-        std::wprintf(L"{ %f, %f, %f }\n", a11, a12, a13);
-        std::wprintf(L"{ %f, %f, ■ }\n", a21, a22);
-        std::wprintf(L"{ □, □, □ }\n");
-        std::cin >> a23;
-
-        std::wprintf(L"Rotation Matrix의 a31 성분을 입력해주세요.\n");
-        std::wprintf(L"{ %f, %f, %f }\n", a11, a12, a13);
-        std::wprintf(L"{ %f, %f, %f }\n", a21, a22, a23);
-        std::wprintf(L"{ ■, □, □ }\n");
-        std::cin >> a31;
-
-        std::wprintf(L"Rotation Matrix의 a32 성분을 입력해주세요.\n");
-        std::wprintf(L"{ %f, %f, %f }\n", a11, a12, a13);
-        std::wprintf(L"{ %f, %f, %f }\n", a21, a22, a23);
-        std::wprintf(L"{ %f, ■, □ }\n", a31);
-        std::cin >> a32;
-
-        std::wprintf(L"Rotation Matrix의 a33 성분을 입력해주세요.\n");
-        std::wprintf(L"{ %f, %f, %f }\n", a11, a12, a13);
-        std::wprintf(L"{ %f, %f, %f }\n", a21, a22, a23);
-        std::wprintf(L"{ %f, %f, ■ }\n", a31, a32);
-        std::cin >> a33;
-
-        Eigen::Matrix3d rotationMatrix;
-        rotationMatrix << a11, a12, a13,
-            a21, a22, a23,
-            a31, a32, a33;
-
+        Eigen::Matrix3d rotationMatrix = inputMatrix;
         rotation(rotationMatrix);
         eraseExternalLattice();
 
-        std::wprintf(L"[latticeRotation] %d개의 입자가 결정구조 내에 존재한다.\n", countPointsWithinLattice());
+        //std::wprintf(L"[latticeRotation] %d개의 입자가 결정구조 내에 존재한다.\n", countPointsWithinLattice());
         scalarCalc();
         std::wprintf(L"\033[0;33m이 함수의 평균 f값은 %f이다.\033[0m\n", scalarSquareAvg());
     }
 
-    void latticeTranslation()
+    void latticeTranslation(double compX, double compY, double compZ)
     {
-        std::wprintf(L"결정구조 평행이동을 시작합니다.");
+        //std::wprintf(L"결정구조 평행이동을 시작합니다.");
         if (latticeConstant == 0)
         {
             std::wprintf(L"[Error] 격자상수가 정의되어있지 않다.");
@@ -647,23 +586,10 @@ export struct Func
         eraseExternalLattice();
         latticeDuplicate();
 
-        double compX = 0, compY = 0, compZ = 0;
-        std::wprintf(L"Translation Vector의 x 성분을 입력해주세요.\n");
-        std::wprintf(L"Vector : { ■, □, □ }\n");
-        std::cin >> compX;
-        std::wprintf(L"Translation Vector의 y 성분을 입력해주세요.\n");
-        std::wprintf(L"Vector : { %f, ■, □ }\n", compX);
-        std::cin >> compY;
-        std::wprintf(L"Translation Vector의 z 성분을 입력해주세요.\n");
-        std::wprintf(L"Vector : { %f, %f, ■ }\n", compX, compY);
-        std::cin >> compZ;
-        std::wprintf(L"다음 벡터로 tranlsation을 진행합니다.\n");
-        std::wprintf(L"Vector : { %f, %f, %f }\n", compX, compY, compZ);
-
         translation(compX, compY, compZ);
         eraseExternalLattice();
 
-        std::wprintf(L"[latticeTranslation] %d개의 입자가 결정구조 내에 존재한다.\n", countPointsWithinLattice());
+        //std::wprintf(L"[latticeTranslation] %d개의 입자가 결정구조 내에 존재한다.\n", countPointsWithinLattice());
         scalarCalc();
         std::wprintf(L"\033[0;33m이 함수의 평균 f값은 %f이다.\033[0m\n", scalarSquareAvg());
     }

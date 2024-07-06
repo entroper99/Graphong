@@ -1,6 +1,9 @@
 #define _SILENCE_ALL_CXX23_DEPRECATION_WARNINGS
 #include <SDL.h>
 #include <Eigen/Dense>
+#include <Eigen/Core>
+#include <unsupported/Eigen/CXX11/Tensor>
+#include <fftw3.h>
 
 export module Func;
 
@@ -9,6 +12,13 @@ import globalVar;
 import constVar;
 import Shapes;
 import randomRange;
+
+
+double calcGaussian(double dx, double dy, double dz, double sigma, double amplitude) 
+{
+    double exponent = -(dx * dx + dy * dy + dz * dz) / (2 * sigma * sigma);
+    return amplitude * exp(exponent);
+}
 
 export struct Func
 {
@@ -76,10 +86,12 @@ export struct Func
             }
             double avgX = totalX / myPoints.size(), avgZ = totalZ / myPoints.size();
             double distX = std::fabs(maxX - minX), distZ = std::fabs(maxZ - minZ);
-            double triSize = 100.0;
-            superTriangle.p1 = { avgX, 0, avgZ - triSize * distZ };
-            superTriangle.p2 = { avgX - triSize * distX, 0, avgZ + triSize * distZ };
-            superTriangle.p3 = { avgX + triSize * distX, 0, avgZ + triSize * distZ };
+            double maxDist = std::max(distX, distZ);
+            double triSize = maxDist * 8.0;
+            superTriangle.p1 = { avgX, 0, avgZ - triSize };
+            superTriangle.p2 = { avgX - triSize, 0, avgZ + triSize };
+            superTriangle.p3 = { avgX + triSize, 0, avgZ + triSize };
+
             checkTriangles = { superTriangle };
             selectPts = { superTriangle.p1,superTriangle.p2,superTriangle.p3 };
 
@@ -746,6 +758,110 @@ export struct Func
         scalarCalc();
         std::wprintf(L"\033[0;33m이 함수의 평균 f값은 %f이다.\033[0m\n", scalarSquareAvg());
     }
+
+    void convertToDensityFuncAndFFT()
+    {
+        if (latticeConstant == 0)
+        {
+            std::wprintf(L"[Error] 시뮬레이션 박스가 정의되지 않은 상태에서는 밀도함수를 만들 수 없다.\n");
+            return;
+        }
+
+        double gaussAmp = 1.0;
+        double gaussSig = 1.0;
+        int numOfLine = 20;
+        std::vector<std::array<double, 4>> densityFunc;
+        double del = latticeConstant / (numOfLine - 1);
+        int gridSize = numOfLine * numOfLine * numOfLine;
+
+        Eigen::Tensor<double, 3> density(numOfLine, numOfLine, numOfLine);
+        density.setZero();
+
+        int idx = 0;
+        for (double tgtZ = -latticeConstant / 2.0; tgtZ <= latticeConstant / 2.0; tgtZ += del)
+        {
+            for (double tgtY = -latticeConstant / 2.0; tgtY <= latticeConstant / 2.0; tgtY += del)
+            {
+                for (double tgtX = -latticeConstant / 2.0; tgtX <= latticeConstant / 2.0; tgtX += del)
+                {
+                    double densityValue = 0;
+                    for (const auto& point : myPoints)
+                    {
+                        densityValue += calcGaussian(point.x - tgtX, point.y - tgtY, point.z - tgtZ, gaussSig, gaussAmp);
+                    }
+                    int xIdx = (tgtX + latticeConstant / 2.0) / del;
+                    int yIdx = (tgtY + latticeConstant / 2.0) / del;
+                    int zIdx = (tgtZ + latticeConstant / 2.0) / del;
+                    density(xIdx, yIdx, zIdx) = densityValue;
+                }
+            }
+        }
+
+        fftw_complex* input, * output;
+        fftw_plan p;
+        input = (fftw_complex*)fftw_malloc(sizeof(fftw_complex) * gridSize);
+        output = (fftw_complex*)fftw_malloc(sizeof(fftw_complex) * gridSize);
+
+        idx = 0;
+        for (int z = 0; z < numOfLine; ++z)
+        {
+            for (int y = 0; y < numOfLine; ++y)
+            {
+                for (int x = 0; x < numOfLine; ++x)
+                {
+                    input[idx][0] = density(x, y, z);//실수
+                    input[idx][1] = 0.0;//허수
+                    ++idx;
+                }
+            }
+        }
+
+        p = fftw_plan_dft_3d(numOfLine, numOfLine, numOfLine, input, output, FFTW_FORWARD, FFTW_ESTIMATE);
+        fftw_execute(p);
+
+        double delta_x = del;
+        double delta_y = del;
+        double delta_z = del;
+
+        Func* resultFunc = new Func(funcFlag::scalarField);
+
+        double maxROut = -99999.0;
+        double minROut = 99999.0;
+        for (int z = 0; z < numOfLine; ++z)
+        {
+            for (int y = 0; y < numOfLine; ++y)
+            {
+                for (int x = 0; x < numOfLine; ++x)
+                {
+                    int i = z * numOfLine * numOfLine + y * numOfLine + x;
+
+                    int kx = (x <= numOfLine / 2) ? x : x - numOfLine;
+                    int ky = (y <= numOfLine / 2) ? y : y - numOfLine;
+                    int kz = (z <= numOfLine / 2) ? z : z - numOfLine;
+
+                    double fx = kx / (numOfLine * delta_x);
+                    double fy = ky / (numOfLine * delta_y);
+                    double fz = kz / (numOfLine * delta_z);
+
+                    std::wprintf(L"%f,%f,%f,%f,%f\n", fx, fy, fz, output[i][0], output[i][1]);
+
+                    if(y==numOfLine/2) resultFunc->myPoints.push_back({ fx,output[i][0],fz });
+                    //resultFunc->scalar[{fx, fy, fz}] = output[i][0];
+                    //if (maxROut < output[i][0]) maxROut = output[i][0];
+                    //if (minROut > output[i][0]) minROut = output[i][0];
+                }
+            }
+        }
+        //resultFunc->scalarInfimum = -10;//minROut;
+        //resultFunc->scalarSupremum = 10;//maxROut;
+        std::wprintf(L"상한은 %f이고 하한은 %f이다.\n", resultFunc->scalarSupremum, resultFunc->scalarInfimum);
+
+        fftw_destroy_plan(p);
+        fftw_free(input);
+        fftw_free(output);
+        delete this;
+    }
+
 };
 
 

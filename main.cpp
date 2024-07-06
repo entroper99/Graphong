@@ -180,10 +180,11 @@ int main(int argc, char** argv)
 
             std::wprintf(L"\033[0;33m29.Sort by COM \033[0m\n");
             std::wprintf(L"\033[0;33m30.Define Lattice Constant \033[0m\n");
-            std::wprintf(L"\033[0;33m31.Crystal Structure Rotaiton \033[0m\n");
-            std::wprintf(L"\033[0;33m32.Crystal Structure Translation \033[0m\n");
+            std::wprintf(L"\033[0;33m31.결정구조 Rotaiton \033[0m\n");
+            std::wprintf(L"\033[0;33m32.결정구조 Translation \033[0m\n");
             std::wprintf(L"\033[0;33m33.Sort by PCA \033[0m\n");
             std::wprintf(L"\033[0;33m34.연속평행이동 \033[0m\n");
+            std::wprintf(L"\033[0;33m35.결정구조 밀도함수 변환 및 FFT\033[0m\n");
             //std::wprintf(L"\033[37m");
             //std::wprintf(L"101.[Plumed] COLVAR : draw time-# Graph \n");
             //std::wprintf(L"102.[Plumed] COLVAR : draw time-biasPot Graph \n");
@@ -949,7 +950,7 @@ int main(int argc, char** argv)
                     //tgtFunc->myPoints.clear();
                     //orthogonal box = (-0.111315 -0.111315 -0.111315) to (10.7379 10.7379 10.7379)
                     //따라서 한변의 지름은 10.7379 - (-0.111315) = 10.849215
-                    double length = 0.5;//GYROID_PERIOD;
+                    double length = 10.849215 / 2.0;//GYROID_PERIOD;
                     double scaleFactor = 2.0 * M_PI / length;
 
                     tgtFunc->scalarFunc = [=](double x, double y, double z)->double
@@ -1183,6 +1184,17 @@ int main(int argc, char** argv)
 
                 Func* tgtFunc = new Func(funcFlag::dim2);
                 for (int i = 0; i < result.size(); i++) tgtFunc->myPoints.push_back({ result[i][0], result[i][1] });
+            }
+            else if (input == 35)
+            {
+                int dataIndex = 0;
+                if (funcSet.size() > 1)
+                {
+                    std::wprintf(L"몇번째 데이터에 연속 평행이동을 할까? (0 ~ %d).\n", funcSet.size() - 1);
+                    prtFuncName();
+                    std::cin >> dataIndex;
+                }
+                ((Func*)funcSet[dataIndex])->convertToDensityFuncAndFFT();
             }
             else std::wprintf(L"잘못된 값이 입력되었다.\n");
         }

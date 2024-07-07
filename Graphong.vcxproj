@@ -106,14 +106,14 @@
       <ConformanceMode>true</ConformanceMode>
       <LanguageStandard>stdcpplatest</LanguageStandard>
       <LanguageStandard_C>stdc17</LanguageStandard_C>
-      <AdditionalIncludeDirectories>$(ProjectDir)\sdl\SDL2-2.0.14\include;$(ProjectDir)\sdl\SDL2_image-2.0.5\include;$(ProjectDir)\sdl\SDL2_mixer-2.0.4\include;$(ProjectDir)\sdl\SDL2_ttf-2.0.15\include;$(ProjectDir)\glew\include\GL;$(ProjectDir)\eigen-3.4.0\eigen-3.4.0;C:\Graphong\glew\include\GL;C:\Graphong\glew\include;C:\Graphong\fftw-3.3.5-dll64</AdditionalIncludeDirectories>
+      <AdditionalIncludeDirectories>C:\SDL\SDL2-2.0.14\include;C:\SDL\SDL2_image-2.0.5\include;C:\SDL\SDL2_mixer-2.0.4\include;C:\SDL\SDL2_ttf-2.0.15\include;C:\lib\glew\include\GL;C:\lib\eigen-3.4.0\eigen-3.4.0;C:\lib\glew\include;C:\lib\fftw-3.3.5-dll64</AdditionalIncludeDirectories>
       <EnableModules>true</EnableModules>
       <BuildStlModules>true</BuildStlModules>
     </ClCompile>
     <Link>
       <SubSystem>Console</SubSystem>
       <GenerateDebugInformation>true</GenerateDebugInformation>
-      <AdditionalLibraryDirectories>$(ProjectDir)\sdl\SDL2-2.0.14\lib\x64;$(ProjectDir)\sdl\SDL2_image-2.0.5\lib\x64;$(ProjectDir)\sdl\SDL2_ttf-2.0.15\lib\x64;$(ProjectDir)\sdl\SDL2_mixer-2.0.4\lib\x64;$(ProjectDir)\glew\lib\Debug\x64;C:\Graphong\fftw-3.3.5-dll64</AdditionalLibraryDirectories>
+      <AdditionalLibraryDirectories>C:\SDL\SDL2-2.0.14\lib\x64;C:\SDL\SDL2_image-2.0.5\lib\x64;C:\SDL\SDL2_ttf-2.0.15\lib\x64;C:\SDL\SDL2_mixer-2.0.4\lib\x64;C:\lib\glew\lib\Debug\x64;C:\lib\fftw-3.3.5-dll64</AdditionalLibraryDirectories>
       <AdditionalDependencies>SDL2.lib;SDL2main.lib;SDL2test.lib;SDL2_image.lib;SDL2_mixer.lib;SDL2_ttf.lib;glew32d.lib;glew32sd.lib;opengl32.lib;glu32.lib;libfftw3l-3.lib;libfftw3-3.lib;libfftw3f-3.lib;%(AdditionalDependencies)</AdditionalDependencies>
     </Link>
   </ItemDefinitionGroup>

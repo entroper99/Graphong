@@ -958,6 +958,8 @@ int main(int argc, char** argv)
                             return (std::cos(scaleFactor *x) * std::sin(scaleFactor * y) * std::sin(2 * (scaleFactor *z)) + std::cos(scaleFactor *y) * std::sin(scaleFactor *z) * std::sin(2 * (scaleFactor *x)) + std::cos(scaleFactor *z) * std::sin(scaleFactor *x) * std::sin(2 * (scaleFactor *y)));
                         };
 
+                    
+
                     tgtFunc->scalarInfimum = -1.0;
                     tgtFunc->scalarSupremum = 1.0;
                     tgtFunc->scalarCalc();

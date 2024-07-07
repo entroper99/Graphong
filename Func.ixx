@@ -823,7 +823,7 @@ export struct Func
         double delta_y = del;
         double delta_z = del;
 
-        Func* resultFunc = new Func(funcFlag::scalarField);
+        //Func* resultFunc = new Func(funcFlag::scalarField);
 
         double maxROut = -99999.0;
         double minROut = 99999.0;
@@ -843,9 +843,9 @@ export struct Func
                     double fy = ky / (numOfLine * delta_y);
                     double fz = kz / (numOfLine * delta_z);
 
-                    std::wprintf(L"%f,%f,%f,%f,%f\n", fx, fy, fz, output[i][0], output[i][1]);
+                    std::wprintf(L"%f   %f  %f  %f  %f\n", fx, fy, fz, output[i][0], output[i][1]);
 
-                    if(y==numOfLine/2) resultFunc->myPoints.push_back({ fx,output[i][0],fz });
+                    //if(y==numOfLine/2) resultFunc->myPoints.push_back({ fx,output[i][0],fz });
                     //resultFunc->scalar[{fx, fy, fz}] = output[i][0];
                     //if (maxROut < output[i][0]) maxROut = output[i][0];
                     //if (minROut > output[i][0]) minROut = output[i][0];
@@ -854,8 +854,9 @@ export struct Func
         }
         //resultFunc->scalarInfimum = -10;//minROut;
         //resultFunc->scalarSupremum = 10;//maxROut;
-        std::wprintf(L"상한은 %f이고 하한은 %f이다.\n", resultFunc->scalarSupremum, resultFunc->scalarInfimum);
+        //std::wprintf(L"상한은 %f이고 하한은 %f이다.\n", resultFunc->scalarSupremum, resultFunc->scalarInfimum);
 
+        std::wprintf(L"푸리에변환이 완료되었다.\n");
         fftw_destroy_plan(p);
         fftw_free(input);
         fftw_free(output);

@@ -58,6 +58,9 @@ export struct Func
 
     double latticeConstant = 0;
 
+    bool hasFourierRef = false;
+    std::vector<std::array<std::complex<double>, 4>> fourierRef;
+
     Func(funcFlag inputType) : funcType(inputType) , scalarFunc([](double x, double y, double z) -> double { return 0.0; })
     {
         funcSet.push_back(this);
@@ -584,7 +587,7 @@ export struct Func
 
         //std::wprintf(L"[latticeRotation] %d개의 입자가 결정구조 내에 존재한다.\n", countPointsWithinLattice());
         scalarCalc();
-        std::wprintf(L"\033[0;33m이 함수의 평균 f값은 %f이다.\033[0m\n", scalarSquareAvg());
+        //std::wprintf(L"\033[0;33m이 함수의 평균 f값은 %f이다.\033[0m\n", scalarSquareAvg());
     }
 
     void latticeTranslation(double compX, double compY, double compZ)
@@ -603,7 +606,7 @@ export struct Func
 
         //std::wprintf(L"[latticeTranslation] %d개의 입자가 결정구조 내에 존재한다.\n", countPointsWithinLattice());
         scalarCalc();
-        std::wprintf(L"\033[0;33m이 함수의 평균 f값은 %f이다.\033[0m\n", scalarSquareAvg());
+        //std::wprintf(L"\033[0;33m이 함수의 평균 f값은 %f이다.\033[0m\n", scalarSquareAvg());
     }
 
     void sortByCOM()
@@ -648,7 +651,7 @@ export struct Func
         scalarCalc();
 
         std::cout << "\n평행이동 벡터" << ":\n" << transVec << "\n\n";
-        std::wprintf(L"\033[0;33m이 함수의 평균 f값은 %f이다.\033[0m\n", scalarSquareAvg());
+        //std::wprintf(L"\033[0;33m이 함수의 평균 f값은 %f이다.\033[0m\n", scalarSquareAvg());
     }
 
     void sortByPCA()
@@ -753,45 +756,45 @@ export struct Func
             axis.normalize();
             std::cout << "회전각 : " << theta * 180.0 / M_PI << std::endl;
             std::cout << "회전축: (" << axis.x() << ", " << axis.y() << ", " << axis.z() << ")" << std::endl;
+
         }
 
         scalarCalc();
-        std::wprintf(L"\033[0;33m이 함수의 평균 f값은 %f이다.\033[0m\n", scalarSquareAvg());
+        //std::wprintf(L"\033[0;33m이 함수의 평균 f값은 %f이다.\033[0m\n", scalarSquareAvg());
     }
 
-    void convertToDensityFuncAndFFT()
+    std::vector<std::array<std::complex<double>, 4>> convertToDensityFuncAndFFT()
     {
         if (latticeConstant == 0)
         {
             std::wprintf(L"[Error] 시뮬레이션 박스가 정의되지 않은 상태에서는 밀도함수를 만들 수 없다.\n");
-            return;
+            return {};
         }
 
         double gaussAmp = 1.0;
         double gaussSig = 1.0;
-        int numOfLine = 20;
         std::vector<std::array<double, 4>> densityFunc;
-        double del = latticeConstant / (numOfLine - 1);
-        int gridSize = numOfLine * numOfLine * numOfLine;
+        double del = latticeConstant / (DENSITY_GRID - 1);
+        int gridSize = DENSITY_GRID * DENSITY_GRID * DENSITY_GRID;
 
-        Eigen::Tensor<double, 3> density(numOfLine, numOfLine, numOfLine);
+        Eigen::Tensor<double, 3> density(DENSITY_GRID, DENSITY_GRID, DENSITY_GRID);
         density.setZero();
 
         int idx = 0;
-        for (double tgtZ = -latticeConstant / 2.0; tgtZ <= latticeConstant / 2.0; tgtZ += del)
+        for (double tgtX = -latticeConstant / 2.0; tgtX <= latticeConstant / 2.0; tgtX += del)
         {
             for (double tgtY = -latticeConstant / 2.0; tgtY <= latticeConstant / 2.0; tgtY += del)
             {
-                for (double tgtX = -latticeConstant / 2.0; tgtX <= latticeConstant / 2.0; tgtX += del)
+                for (double tgtZ = -latticeConstant / 2.0; tgtZ <= latticeConstant / 2.0; tgtZ += del)
                 {
                     double densityValue = 0;
                     for (const auto& point : myPoints)
                     {
                         densityValue += calcGaussian(point.x - tgtX, point.y - tgtY, point.z - tgtZ, gaussSig, gaussAmp);
                     }
-                    int xIdx = (tgtX + latticeConstant / 2.0) / del;
-                    int yIdx = (tgtY + latticeConstant / 2.0) / del;
-                    int zIdx = (tgtZ + latticeConstant / 2.0) / del;
+                    int xIdx = std::round((tgtX + latticeConstant / 2.0) / del);
+                    int yIdx = std::round((tgtY + latticeConstant / 2.0) / del);
+                    int zIdx = std::round((tgtZ + latticeConstant / 2.0) / del);
                     density(xIdx, yIdx, zIdx) = densityValue;
                 }
             }
@@ -801,13 +804,20 @@ export struct Func
         fftw_plan p;
         input = (fftw_complex*)fftw_malloc(sizeof(fftw_complex) * gridSize);
         output = (fftw_complex*)fftw_malloc(sizeof(fftw_complex) * gridSize);
+        if (!input || !output) 
+        {
+            std::wprintf(L"[FFT] 메모리 할당 실패\n");
+            if (input) fftw_free(input);
+            if (output) fftw_free(output);
+            return {};
+        }
 
         idx = 0;
-        for (int z = 0; z < numOfLine; ++z)
+        for (int x = 0; x < DENSITY_GRID; ++x)
         {
-            for (int y = 0; y < numOfLine; ++y)
+            for (int y = 0; y < DENSITY_GRID; ++y)
             {
-                for (int x = 0; x < numOfLine; ++x)
+                for (int z = 0; z < DENSITY_GRID; ++z)
                 {
                     input[idx][0] = density(x, y, z);//실수
                     input[idx][1] = 0.0;//허수
@@ -816,54 +826,209 @@ export struct Func
             }
         }
 
-        p = fftw_plan_dft_3d(numOfLine, numOfLine, numOfLine, input, output, FFTW_FORWARD, FFTW_ESTIMATE);
+        p = fftw_plan_dft_3d(DENSITY_GRID, DENSITY_GRID, DENSITY_GRID, input, output, FFTW_FORWARD, FFTW_ESTIMATE);
         fftw_execute(p);
 
         double delta_x = del;
         double delta_y = del;
         double delta_z = del;
 
-        //Func* resultFunc = new Func(funcFlag::scalarField);
 
-        double maxROut = -99999.0;
-        double minROut = 99999.0;
-        for (int z = 0; z < numOfLine; ++z)
+        std::vector<std::array<std::complex<double>, 4>> fourierResult;
+        for (int x = 0; x < DENSITY_GRID; ++x)
         {
-            for (int y = 0; y < numOfLine; ++y)
+            for (int y = 0; y < DENSITY_GRID; ++y)
             {
-                for (int x = 0; x < numOfLine; ++x)
+                for (int z = 0; z < DENSITY_GRID; ++z)
                 {
-                    int i = z * numOfLine * numOfLine + y * numOfLine + x;
+                    int i = z * DENSITY_GRID * DENSITY_GRID + y * DENSITY_GRID + x;
 
-                    int kx = (x <= numOfLine / 2) ? x : x - numOfLine;
-                    int ky = (y <= numOfLine / 2) ? y : y - numOfLine;
-                    int kz = (z <= numOfLine / 2) ? z : z - numOfLine;
+                    int kx = (x <= DENSITY_GRID / 2) ? x : x - DENSITY_GRID;
+                    int ky = (y <= DENSITY_GRID / 2) ? y : y - DENSITY_GRID;
+                    int kz = (z <= DENSITY_GRID / 2) ? z : z - DENSITY_GRID;
 
-                    double fx = kx / (numOfLine * delta_x);
-                    double fy = ky / (numOfLine * delta_y);
-                    double fz = kz / (numOfLine * delta_z);
+                    double fx = kx / (DENSITY_GRID * delta_x);
+                    double fy = ky / (DENSITY_GRID * delta_y);
+                    double fz = kz / (DENSITY_GRID * delta_z);
 
-                    std::wprintf(L"%f   %f  %f  %f  %f\n", fx, fy, fz, output[i][0], output[i][1]);
-
-                    //if(y==numOfLine/2) resultFunc->myPoints.push_back({ fx,output[i][0],fz });
-                    //resultFunc->scalar[{fx, fy, fz}] = output[i][0];
-                    //if (maxROut < output[i][0]) maxROut = output[i][0];
-                    //if (minROut > output[i][0]) minROut = output[i][0];
+                    std::complex<double> complexVal(output[i][0], output[i][1]);
+                    fourierResult.push_back({ std::complex<double>(kx, 0), std::complex<double>(ky, 0), std::complex<double>(kz, 0), complexVal });
                 }
             }
         }
-        //resultFunc->scalarInfimum = -10;//minROut;
-        //resultFunc->scalarSupremum = 10;//maxROut;
-        //std::wprintf(L"상한은 %f이고 하한은 %f이다.\n", resultFunc->scalarSupremum, resultFunc->scalarInfimum);
-
-        std::wprintf(L"푸리에변환이 완료되었다.\n");
+        
         fftw_destroy_plan(p);
         fftw_free(input);
         fftw_free(output);
-        delete this;
+        return fourierResult;
     }
 
+    void saveFourierRef()
+    {
+        if (latticeConstant == 0)
+        {
+            std::wprintf(L"[Error] 격자상수가 정의되지 않았다.\n");
+            return;
+        }
+        hasFourierRef = true;
+        fourierRef = convertToDensityFuncAndFFT();
+    }
+
+    double calcMSELossAmpFFT(const std::vector<std::array<std::complex<double>, 4>>& resultFFT)
+    {
+        if (!hasFourierRef)
+        {
+            std::wprintf(L"[Error] 레퍼런스 FFT가 정의되지 않았다.\n");
+            return -1.0;
+        }
+
+        double loss = 0.0;
+        for (int i = 0; i < resultFFT.size(); ++i)
+        {
+            double ampRef = std::abs(fourierRef[i][3]);
+            double ampTgt = std::abs(resultFFT[i][3]);
+            loss += std::pow(ampRef - ampTgt, 2);
+        }
+        return loss / (double)resultFFT.size();
+    }
+
+    double calcMSELossPhaseFFT(const std::vector<std::array<std::complex<double>, 4>>& resultFFT)
+    {
+        if (!hasFourierRef)
+        {
+            std::wprintf(L"[Error] 레퍼런스 FFT가 정의되지 않았다.\n");
+            return -1.0;
+        }
+
+        double loss = 0.0;
+        for (int i = 0; i < resultFFT.size(); ++i)
+        {
+            double phaseRef = std::arg(fourierRef[i][3]);
+            double phaseTgt = std::arg(resultFFT[i][3]);
+            loss += std::pow(phaseRef - phaseTgt, 2);
+        }
+        return loss / (double)resultFFT.size();
+    }
+
+
+    void getRotationByFFT()
+    {
+        if (hasFourierRef == false)
+        {
+            std::wprintf(L"[Error] 참조할 푸리에 변환 값이 존재하지 않는다.\n");
+            return;
+        }
+
+        double minLoss = std::numeric_limits<double>::max();
+        Eigen::Matrix3d minMat;
+        minMat << 1, 0, 0,
+            0, 1, 0,
+            0, 0, 1;
+        const double degreeToRadian = M_PI / 180.0;
+        for (int x_angle = 0; x_angle < 360; x_angle+=15.0) 
+        {
+            for (int y_angle = 0; y_angle < 360; y_angle+=15.0) 
+            {
+                for (int z_angle = 0; z_angle < 360; z_angle+=15.0) 
+                {
+                    double x_rad = x_angle * degreeToRadian;
+                    double y_rad = y_angle * degreeToRadian;
+                    double z_rad = z_angle * degreeToRadian;
+
+                    Eigen::Matrix3d rotX, rotY, rotZ;
+                    rotX << 1, 0, 0,
+                        0, cos(x_rad), -sin(x_rad),
+                        0, sin(x_rad), cos(x_rad);
+
+                    rotY << cos(y_rad), 0, sin(y_rad),
+                        0, 1, 0,
+                        -sin(y_rad), 0, cos(y_rad);
+
+                    rotZ << cos(z_rad), -sin(z_rad), 0,
+                        sin(z_rad), cos(z_rad), 0,
+                        0, 0, 1;
+
+                    std::vector<Point> originalPoints = myPoints;
+                    Eigen::Matrix3d inputRot = rotZ * rotY * rotX;
+                    latticeRotation(inputRot);
+                    std::vector<std::array<std::complex<double>, 4>> resultFFT = convertToDensityFuncAndFFT();
+                    double loss = calcMSELossAmpFFT(resultFFT);
+                    if (loss < minLoss)
+                    {
+                        minLoss = loss;
+                        minMat = inputRot;
+                    }
+                    myPoints = originalPoints;
+
+                    std::wprintf(L"FFT : x_angle: %d, y_angle: %d, z_angle: %d\n", x_angle, y_angle, z_angle);
+                }
+            }
+        }
+
+        std::wprintf(L"최소 손실을 가지는 회전행렬은 다음과 같다.\n");
+        std::cout << minMat << std::endl;
+        {
+            Eigen::Matrix3d checkMat = minMat;
+            double trace = checkMat.trace();
+            double theta = std::acos((trace - 1) / 2);
+            Eigen::Vector3d axis;
+            axis << checkMat(2, 1) - checkMat(1, 2),
+                checkMat(0, 2) - checkMat(2, 0),
+                checkMat(1, 0) - checkMat(0, 1);
+            if (axis.norm() != 0) axis.normalize();
+            else axis << 1, 0, 0;
+            std::cout << "회전각 : " << theta * 180.0 / M_PI << std::endl;
+            std::cout << "회전축: (" << axis.x() << ", " << axis.y() << ", " << axis.z() << ")" << std::endl;
+        }
+    }
+
+
+    void getTranslationByFFT()
+    {
+        if (hasFourierRef == false)
+        {
+            std::wprintf(L"[Error] 참조할 푸리에 변환 값이 존재하지 않는다.\n");
+            return;
+        }
+
+        double minLoss = std::numeric_limits<double>::max();
+        Eigen::Vector3d minVec;
+        minVec << 0, 0, 0;
+        const double pi = 3.14159265358979323846;
+        const double degreeToRadian = pi / 180.0;
+
+        
+        double del = latticeConstant / 10.0;
+        for (double dx = -latticeConstant/2.0; dx < latticeConstant/2.0; dx+= del)
+        {
+            for (double dy = -latticeConstant / 2.0; dy < latticeConstant / 2.0; dy += del)
+            {
+                for (double dz = -latticeConstant / 2.0; dz < latticeConstant / 2.0; dz += del)
+                {
+                    std::vector<Point> originalPoints = myPoints;
+                    latticeTranslation(dx,dy,dz);
+                    std::vector<std::array<std::complex<double>, 4>> resultFFT = convertToDensityFuncAndFFT();
+                    double loss = calcMSELossPhaseFFT(resultFFT);
+                    if (loss < minLoss)
+                    {
+                        minLoss = loss;
+                        minVec = { dx,dy,dz };
+                    }
+                    myPoints = originalPoints;
+                    std::wprintf(L"FFT : dx: %f, dy: %f, dz: %f\n", dx, dy, dz);
+                }
+            }
+        }
+
+        std::wprintf(L"최소 손실을 가지는 평행이동 벡터는 다음과 같다.\n");
+        std::cout << minVec << std::endl;
+    }
+
+
+
 };
+
+
 
 
 

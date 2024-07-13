@@ -186,4 +186,5 @@ export namespace lowCol
 };
 
 
-export const double GYROID_PERIOD = 10.849215;
+export constexpr double BOX_SIZE = 10.849215;
+export constexpr int DENSITY_GRID = 20;

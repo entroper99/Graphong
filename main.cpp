@@ -175,9 +175,7 @@ int main(int argc, char** argv)
             std::wprintf(L"24.함수값 출력\n");
             std::wprintf(L"25.중심점에 대해 함수 표준화\n");
             std::wprintf(L"26.PDE Solver\n");
-            std::wprintf(L"27.LAMMPS Trajectory 파일 읽기(타임스텝 0)\n");
-            std::wprintf(L"28.LAMMPS Trajectory 파일 읽기(모든 타임스텝)\n");
-
+            std::wprintf(L"27.LAMMPS Trajectory 파일 읽기\n");
             std::wprintf(L"\033[0;33m29.Sort by COM \033[0m\n");
             std::wprintf(L"\033[0;33m30.Define Lattice Constant \033[0m\n");
             std::wprintf(L"\033[0;33m31.결정구조 Rotaiton \033[0m\n");
@@ -185,6 +183,9 @@ int main(int argc, char** argv)
             std::wprintf(L"\033[0;33m33.Sort by PCA \033[0m\n");
             std::wprintf(L"\033[0;33m34.연속평행이동 \033[0m\n");
             std::wprintf(L"\033[0;33m35.결정구조 밀도함수 변환 및 FFT\033[0m\n");
+            std::wprintf(L"\033[0;33m36.푸리에변환 레퍼런스 입력\033[0m\n");
+            std::wprintf(L"\033[0;33m37.푸리에변환 Amplitude Spectrum 회전행렬 구하기\033[0m\n");
+            std::wprintf(L"\033[0;33m38.푸리에변환 Phase Spectrum 평행이동벡터 구하기\033[0m\n");
             //std::wprintf(L"\033[37m");
             //std::wprintf(L"101.[Plumed] COLVAR : draw time-# Graph \n");
             //std::wprintf(L"102.[Plumed] COLVAR : draw time-biasPot Graph \n");
@@ -737,7 +738,7 @@ int main(int argc, char** argv)
                 std::wprintf(L"몇번째 데이터를 표준화시킬까? (0 ~ %d).\n", funcSet.size() - 1);
                 prtFuncName();
                 std::cin >> dataIndex;
-                ((Func*)funcSet[dataIndex])->invariablize(GYROID_PERIOD);
+                ((Func*)funcSet[dataIndex])->invariablize(BOX_SIZE);
             }
             else if (input == 26)
             {
@@ -945,12 +946,12 @@ int main(int argc, char** argv)
                 {
                     readTrjFile(file, 9, -1, 2, 3, 4,1,2);
                     Func* tgtFunc = ((Func*)funcSet[funcSet.size() - 1]);
-                    tgtFunc->period = GYROID_PERIOD;
+                    tgtFunc->period = BOX_SIZE / 2.0;
 
                     //tgtFunc->myPoints.clear();
                     //orthogonal box = (-0.111315 -0.111315 -0.111315) to (10.7379 10.7379 10.7379)
                     //따라서 한변의 지름은 10.7379 - (-0.111315) = 10.849215
-                    double length = 10.849215 / 2.0;//GYROID_PERIOD;
+                    double length = BOX_SIZE / 2.0;
                     double scaleFactor = 2.0 * M_PI / length;
 
                     tgtFunc->scalarFunc = [=](double x, double y, double z)->double
@@ -958,62 +959,14 @@ int main(int argc, char** argv)
                             return (std::cos(scaleFactor *x) * std::sin(scaleFactor * y) * std::sin(2 * (scaleFactor *z)) + std::cos(scaleFactor *y) * std::sin(scaleFactor *z) * std::sin(2 * (scaleFactor *x)) + std::cos(scaleFactor *z) * std::sin(scaleFactor *x) * std::sin(2 * (scaleFactor *y)));
                         };
 
-                    
-
                     tgtFunc->scalarInfimum = -1.0;
                     tgtFunc->scalarSupremum = 1.0;
                     tgtFunc->scalarCalc();
-                    tgtFunc->latticeConstant = GYROID_PERIOD;
-                    tgtFunc->translation(-10.849215/2.0, -10.849215 / 2.0, -10.849215 / 2.0);
+                    tgtFunc->latticeConstant = BOX_SIZE;// / 2.0;
+                    tgtFunc->translation(-BOX_SIZE /2.0, -BOX_SIZE / 2.0, -BOX_SIZE / 2.0);
                     std::wprintf(L"이 함수의 평균 f값은 %f이다.\n", tgtFunc->scalarSquareAvg());
                 }
                 else std::wprintf(L"파일을 읽는데 실패하였습니다.\n");
-            }
-            else if (input == 28)//trajectory 읽기(모든 타임스텝)
-            {
-                for(int atomType = 1; atomType <=2; atomType++)
-                {
-                    std::wstring file = L"";
-                    std::wprintf(L"데이터가 있는 파일을 선택해주세요.\n");
-                    file = openFileDialog();
-                    std::wprintf(L"파일 %ls 를 대상으로 설정하였다.\n", file.c_str());
-                    std::ifstream in(file);
-                    if (in.is_open())
-                    {
-                        std::string str;
-                        in.seekg(0, std::ios::end);
-                        size_t size = in.tellg();
-                        str.resize(size);
-                        in.seekg(0, std::ios::beg);
-                        in.read(&str[0], size);
-                        in.close();
-
-                        Func* timeGraphFunc = new Func(funcFlag::scalarField);
-                        timeGraphFunc->funcType = funcFlag::dim2;
-                        timeGraphFunc->funcName = L"TIME-STEP F_AVG";
-                        timeGraphFunc->myColor = inputCol();
-
-                        int i = 0;
-                        while (1)
-                        {
-                            readTrjString(str, 9, -1, 2, 3, 4, 1, atomType);
-                            Func* tgtGyroid = ((Func*)funcSet[funcSet.size() - 1]);
-                            tgtGyroid->invariablize(GYROID_PERIOD);
-                            tgtGyroid->scalarCalc();
-                            timeGraphFunc->myPoints.push_back({ (double)i,tgtGyroid->scalarSquareAvg(),0 });
-                            delete tgtGyroid;
-
-                            size_t firstTimestepPos = str.find("ITEM: TIMESTEP");
-                            size_t secondTimestepPos = str.find("ITEM: TIMESTEP", firstTimestepPos + 1);
-                            if (secondTimestepPos == std::string::npos) break;
-                            else str = str.substr(secondTimestepPos);
-                            i++;
-                        }
-                    }
-                    else std::wprintf(L"파일을 읽는데 실패하였습니다.\n");
-
-                    Func::hasTransform = false;
-                }
             }
             else if (input == 29)
             {
@@ -1112,6 +1065,7 @@ int main(int argc, char** argv)
                     a21, a22, a23,
                     a31, a32, a33;
 
+
                 ((Func*)funcSet[dataIndex])->latticeRotation(inputMatrix);
             }
             else if (input == 32)
@@ -1197,6 +1151,39 @@ int main(int argc, char** argv)
                     std::cin >> dataIndex;
                 }
                 ((Func*)funcSet[dataIndex])->convertToDensityFuncAndFFT();
+            }
+            else if (input == 36)
+            {
+                int dataIndex = 0;
+                if (funcSet.size() > 1)
+                {
+                    std::wprintf(L"몇번째 데이터를 레퍼런스 값으로 설정할까? (0 ~ %d).\n", funcSet.size() - 1);
+                    prtFuncName();
+                    std::cin >> dataIndex;
+                }
+                ((Func*)funcSet[dataIndex])->saveFourierRef();
+            }
+            else if (input == 37)
+            {
+                int dataIndex = 0;
+                if (funcSet.size() > 1)
+                {
+                    std::wprintf(L"몇번째 데이터의 회전행렬을 구해낼까? (0 ~ %d).\n", funcSet.size() - 1);
+                    prtFuncName();
+                    std::cin >> dataIndex;
+                }
+                ((Func*)funcSet[dataIndex])->getRotationByFFT();
+            }
+            else if (input == 38)
+            {
+                int dataIndex = 0;
+                if (funcSet.size() > 1)
+                {
+                    std::wprintf(L"몇번째 데이터의 평행이동 벡터를 구해낼까? 회전정렬이 되어있어야함 (0 ~ %d).\n", funcSet.size() - 1);
+                    prtFuncName();
+                    std::cin >> dataIndex;
+                }
+                ((Func*)funcSet[dataIndex])->getTranslationByFFT();
             }
             else std::wprintf(L"잘못된 값이 입력되었다.\n");
         }

@@ -20,25 +20,11 @@ import rainbow;
 import cubicSpline;
 import inputCol;
 import Func;
+import utilMath;
+import utilFile;
 
 
-std::wstring openFileDialog() 
-{
-    WCHAR filename[MAX_PATH];
 
-    OPENFILENAME ofn;
-    ZeroMemory(&filename, sizeof(filename));
-    ZeroMemory(&ofn, sizeof(ofn));
-    ofn.lStructSize = sizeof(ofn);
-    ofn.hwndOwner = NULL; 
-    ofn.lpstrFilter = L"All Files\0*.*\0Text Files\0*.TXT\0";
-    ofn.lpstrFile = filename;
-    ofn.nMaxFile = MAX_PATH;
-    ofn.lpstrTitle = L"데이터가 있는 파일을 선택해주세요.";
-    ofn.Flags = OFN_DONTADDTORECENT | OFN_FILEMUSTEXIST;
-    if (GetOpenFileName(&ofn)) return std::wstring(filename);
-    else return L"";
-}
 
 void prtFuncName()
 {
@@ -156,10 +142,8 @@ int main(int argc, char** argv)
             if (camFixMinusZ || camFixZ || camFixMinusX || camFixX || camFixMinusY || camFixY) std::wprintf(L"7.Axis 카메라 고정 해제\n");
             else std::wprintf(L"7.2차원 카메라 고정\n");
             std::wprintf(L"\033[0;33m8.Delaunay 삼각분할\033[0m\n");
-
             std::wprintf(L"9. 함수 Translation (평행이동)\n");
             std::wprintf(L"10. 함수 Rotation (회전)\n");
-
             std::wprintf(L"\033[0;33m11.[2차원] Cubic 스플라인 보간 실행\033[0m\n");
             std::wprintf(L"\033[0;33m12.[2차원] 기존 보간값에 대해 선형 보간 실행\033[0m\n");
             if (visDataPoint)  std::wprintf(L"14.데이터점 화면 표시 [ \033[0;32mON\033[0m / OFF ]\n");
@@ -572,21 +556,7 @@ int main(int argc, char** argv)
                 std::wprintf(L"{ %f, %f, %f }\n", a11, a12, a13);
                 std::wprintf(L"{ %f, %f, %f }\n", a21, a22, a23);
                 std::wprintf(L"{ %f, %f, %f }\n", a31, a32, a33);
-
-                {
-                    Eigen::Matrix3d checkMat = rotationMatrix;
-                    double trace = checkMat.trace();
-                    double theta = std::acos((trace - 1) / 2);
-                    Eigen::Vector3d axis;
-                    axis << checkMat(2, 1) - checkMat(1, 2),
-                        checkMat(0, 2) - checkMat(2, 0),
-                        checkMat(1, 0) - checkMat(0, 1);
-                    axis.normalize();
-                    std::cout << "회전각 : " << theta * 180.0 / M_PI << std::endl;
-                    std::cout << "회전축: (" << axis.x() << ", " << axis.y() << ", " << axis.z() << ")" << std::endl;
-                }
-
-
+                printRotationMatrix(rotationMatrix);
 
                 ((Func*)funcSet[dataIndex])->rotation(rotationMatrix);
                 ((Func*)funcSet[dataIndex])->scalarCalc();
@@ -1065,7 +1035,9 @@ int main(int argc, char** argv)
                     a21, a22, a23,
                     a31, a32, a33;
 
-
+                std::wprintf(L"입력이 완료되었다.\n");
+                std::wprintf(L"다음 행렬로 rotation을 진행합니다.\n");
+                printRotationMatrix(inputMatrix);
                 ((Func*)funcSet[dataIndex])->latticeRotation(inputMatrix);
             }
             else if (input == 32)
@@ -1088,6 +1060,7 @@ int main(int argc, char** argv)
                 std::wprintf(L"Translation Vector의 z 성분을 입력해주세요.\n");
                 std::wprintf(L"Vector : { %f, %f, ■ }\n", compX, compY);
                 std::cin >> compZ;
+                std::wprintf(L"입력이 완료되었다.\n");
                 std::wprintf(L"다음 벡터로 tranlsation을 진행합니다.\n");
                 std::wprintf(L"Vector : { %f, %f, %f }\n", compX, compY, compZ);
 

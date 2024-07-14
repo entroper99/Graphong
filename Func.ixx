@@ -12,13 +12,9 @@ import globalVar;
 import constVar;
 import Shapes;
 import randomRange;
+import utilMath;
 
 
-double calcGaussian(double dx, double dy, double dz, double sigma, double amplitude) 
-{
-    double exponent = -(dx * dx + dy * dy + dz * dz) / (2 * sigma * sigma);
-    return amplitude * exp(exponent);
-}
 
 export struct Func
 {
@@ -385,20 +381,8 @@ export struct Func
 
         std::cout << "\n평행이동 벡터" << ":\n" << transVec << "\n\n";
         std::cout << "\n회전행렬 " << ":\n" << rotMat << "\n\n";
-        {
-            Eigen::Matrix3d checkMat = rotMat;
-            double trace = checkMat.trace();
-            double theta = std::acos((trace - 1) / 2);
-            Eigen::Vector3d axis;
-            axis << checkMat(2, 1) - checkMat(1, 2),
-                checkMat(0, 2) - checkMat(2, 0),
-                checkMat(1, 0) - checkMat(0, 1);
-            axis.normalize();
-            std::cout << "회전각 : " << theta * 180.0 / M_PI << std::endl;
-            std::cout << "회전축: (" << axis.x() << ", " << axis.y() << ", " << axis.z() << ")" << std::endl;
-        }
-
         rotation(rotMat);
+        printRotationMatrix(rotMat);
 
         scalarCalc();
         std::wprintf(L"표준화를 완료하였다.\n");
@@ -466,18 +450,6 @@ export struct Func
         }
 
         return totalVal / (double)myPoints.size();
-    }
-
-    double scalarL2Norm()
-    {
-        double totalVal = 0;
-        for (int i = 0; i < myPoints.size(); i++)
-        {
-            double val = scalar[{myPoints[i].x, myPoints[i].y, myPoints[i].z}];
-            totalVal += val * val;
-        }
-
-        return std::sqrt(totalVal);
     }
 
     double scalarSquareAvg()
@@ -743,22 +715,7 @@ export struct Func
         latticeDuplicate();
         rotation(rotMat);
         eraseExternalLattice();
-        
-        std::cout << "\n회전행렬 " << ":\n" << rotMat << "\n\n";
-        {
-            Eigen::Matrix3d checkMat = rotMat;
-            double trace = checkMat.trace();
-            double theta = std::acos((trace - 1) / 2);
-            Eigen::Vector3d axis;
-            axis << checkMat(2, 1) - checkMat(1, 2),
-                checkMat(0, 2) - checkMat(2, 0),
-                checkMat(1, 0) - checkMat(0, 1);
-            axis.normalize();
-            std::cout << "회전각 : " << theta * 180.0 / M_PI << std::endl;
-            std::cout << "회전축: (" << axis.x() << ", " << axis.y() << ", " << axis.z() << ")" << std::endl;
-
-        }
-
+        printRotationMatrix(rotMat);
         scalarCalc();
         //std::wprintf(L"\033[0;33m이 함수의 평균 f값은 %f이다.\033[0m\n", scalarSquareAvg());
     }
@@ -767,7 +724,7 @@ export struct Func
     {
         if (latticeConstant == 0)
         {
-            std::wprintf(L"[Error] 시뮬레이션 박스가 정의되지 않은 상태에서는 밀도함수를 만들 수 없다.\n");
+            std::wprintf(L"[Error] 시뮬레이션 박스(격자상수)가 정의되지 않은 상태에서는 밀도함수를 만들 수 없다.\n");
             return {};
         }
 
@@ -870,6 +827,8 @@ export struct Func
             std::wprintf(L"[Error] 격자상수가 정의되지 않았다.\n");
             return;
         }
+
+        std::wprintf(L"%p 함수에 새로운 Fourier reference를 추가했다.\n",this);
         hasFourierRef = true;
         fourierRef = convertToDensityFuncAndFFT();
     }
@@ -910,13 +869,12 @@ export struct Func
         return loss / (double)resultFFT.size();
     }
 
-
-    void getRotationByFFT()
+    Eigen::Matrix3d getRotationByFFT()
     {
         if (hasFourierRef == false)
         {
             std::wprintf(L"[Error] 참조할 푸리에 변환 값이 존재하지 않는다.\n");
-            return;
+            return {};
         }
 
         double minLoss = std::numeric_limits<double>::max();
@@ -967,28 +925,15 @@ export struct Func
 
         std::wprintf(L"최소 손실을 가지는 회전행렬은 다음과 같다.\n");
         std::cout << minMat << std::endl;
-        {
-            Eigen::Matrix3d checkMat = minMat;
-            double trace = checkMat.trace();
-            double theta = std::acos((trace - 1) / 2);
-            Eigen::Vector3d axis;
-            axis << checkMat(2, 1) - checkMat(1, 2),
-                checkMat(0, 2) - checkMat(2, 0),
-                checkMat(1, 0) - checkMat(0, 1);
-            if (axis.norm() != 0) axis.normalize();
-            else axis << 1, 0, 0;
-            std::cout << "회전각 : " << theta * 180.0 / M_PI << std::endl;
-            std::cout << "회전축: (" << axis.x() << ", " << axis.y() << ", " << axis.z() << ")" << std::endl;
-        }
+        printRotationMatrix(minMat);
     }
 
-
-    void getTranslationByFFT()
+    Eigen::Vector3d getTranslationByFFT()
     {
         if (hasFourierRef == false)
         {
             std::wprintf(L"[Error] 참조할 푸리에 변환 값이 존재하지 않는다.\n");
-            return;
+            return {};
         }
 
         double minLoss = std::numeric_limits<double>::max();
@@ -1022,6 +967,7 @@ export struct Func
 
         std::wprintf(L"최소 손실을 가지는 평행이동 벡터는 다음과 같다.\n");
         std::cout << minVec << std::endl;
+        return minVec;
     }
 
 

@@ -45,10 +45,13 @@
     <ClCompile Include="inputCol.ixx">
       <Filter>소스 파일</Filter>
     </ClCompile>
-    <ClCompile Include="addGyroid.ixx">
+    <ClCompile Include="Func.ixx">
       <Filter>소스 파일</Filter>
     </ClCompile>
-    <ClCompile Include="Func.ixx">
+    <ClCompile Include="utilMath.ixx">
+      <Filter>소스 파일</Filter>
+    </ClCompile>
+    <ClCompile Include="utilFile.ixx">
       <Filter>소스 파일</Filter>
     </ClCompile>
   </ItemGroup>

@@ -141,6 +141,7 @@
     <ClCompile Include="globalVar.ixx" />
     <ClCompile Include="inputCol.ixx" />
     <ClCompile Include="main.cpp" />
+    <ClCompile Include="nanoTimer.ixx" />
     <ClCompile Include="utilFile.ixx" />
     <ClCompile Include="utilMath.ixx" />
     <ClCompile Include="rainbow.ixx" />

@@ -13,8 +13,7 @@ import constVar;
 import Shapes;
 import randomRange;
 import utilMath;
-
-
+import nanoTimer;
 
 export struct Func
 {
@@ -871,6 +870,7 @@ export struct Func
 
     Eigen::Matrix3d getRotationByFFT()
     {
+        __int64 startTimeStamp = getNanoTimer();
         if (hasFourierRef == false)
         {
             std::wprintf(L"[Error] 참조할 푸리에 변환 값이 존재하지 않는다.\n");
@@ -883,53 +883,64 @@ export struct Func
             0, 1, 0,
             0, 0, 1;
         const double degreeToRadian = M_PI / 180.0;
-        for (int x_angle = 0; x_angle < 360; x_angle+=15.0) 
+
+
+        for (int xAngle = 0; xAngle < 360; xAngle+=15.0) 
         {
-            for (int y_angle = 0; y_angle < 360; y_angle+=15.0) 
+            for (int yAngle = 0; yAngle < 360; yAngle+=15.0) 
             {
-                for (int z_angle = 0; z_angle < 360; z_angle+=15.0) 
+                for (int zAngle = 0; zAngle < 360; zAngle+=15.0) 
                 {
-                    double x_rad = x_angle * degreeToRadian;
-                    double y_rad = y_angle * degreeToRadian;
-                    double z_rad = z_angle * degreeToRadian;
+                    double xRad = xAngle * degreeToRadian; //x축 회전
+                    double yRad = yAngle * degreeToRadian; //y축 회전
+                    double zRad = zAngle * degreeToRadian; //z축 회전
 
                     Eigen::Matrix3d rotX, rotY, rotZ;
                     rotX << 1, 0, 0,
-                        0, cos(x_rad), -sin(x_rad),
-                        0, sin(x_rad), cos(x_rad);
+                        0, cos(xRad), -sin(xRad),
+                        0, sin(xRad), cos(xRad);
 
-                    rotY << cos(y_rad), 0, sin(y_rad),
+                    rotY << cos(yRad), 0, sin(yRad),
                         0, 1, 0,
-                        -sin(y_rad), 0, cos(y_rad);
+                        -sin(yRad), 0, cos(yRad);
 
-                    rotZ << cos(z_rad), -sin(z_rad), 0,
-                        sin(z_rad), cos(z_rad), 0,
+                    rotZ << cos(zRad), -sin(zRad), 0,
+                        sin(zRad), cos(zRad), 0,
                         0, 0, 1;
 
-                    std::vector<Point> originalPoints = myPoints;
+                    std::vector<Point> originalPoints = myPoints;//백업
                     Eigen::Matrix3d inputRot = rotZ * rotY * rotX;
-                    latticeRotation(inputRot);
+                    latticeRotation(inputRot); // 결정구조 회전 후 나간 입자 제거 및 빈 공간은 다시 채움(주기조건)
                     std::vector<std::array<std::complex<double>, 4>> resultFFT = convertToDensityFuncAndFFT();
-                    double loss = calcMSELossAmpFFT(resultFFT);
-                    if (loss < minLoss)
+                    double loss = calcMSELossAmpFFT(resultFFT); // MSE 손실함수
+                    if (loss < minLoss) // 가장 낮은 손실함수를 가진 회전행렬을 찾음
                     {
                         minLoss = loss;
                         minMat = inputRot;
                     }
-                    myPoints = originalPoints;
+                    myPoints = originalPoints; //원래 입자 배열로 회귀
 
-                    std::wprintf(L"FFT : x_angle: %d, y_angle: %d, z_angle: %d\n", x_angle, y_angle, z_angle);
+                    std::wprintf(L"FFT is in progress : xAngle: %d, yAngle: %d, zAngle: %d\n", xAngle, yAngle, zAngle);
                 }
             }
         }
 
-        std::wprintf(L"최소 손실을 가지는 회전행렬은 다음과 같다.\n");
+        std::wprintf(L"======================================================================================\n");
+        std::wprintf(L"스펙트럼 분석이 완료되었다.\n");
+        __int64 elapsedSeconds = (getNanoTimer() - startTimeStamp) / 1e9;
+        int hours = elapsedSeconds / 3600;
+        int minutes = (elapsedSeconds % 3600) / 60;
+        int seconds = elapsedSeconds % 60;
+        std::wprintf(L"걸린 시간 : %02d시간 %02d분 %02d초\n", hours, minutes, seconds);
+        std::wprintf(L"스펙트럼 분석이 완료되었다. 최소 손실을 가지는 회전행렬은 다음과 같다.\n");
         std::cout << minMat << std::endl;
         printRotationMatrix(minMat);
     }
 
     Eigen::Vector3d getTranslationByFFT()
     {
+        __int64 startTimeStamp = getNanoTimer();
+
         if (hasFourierRef == false)
         {
             std::wprintf(L"[Error] 참조할 푸리에 변환 값이 존재하지 않는다.\n");
@@ -942,7 +953,8 @@ export struct Func
         const double pi = 3.14159265358979323846;
         const double degreeToRadian = pi / 180.0;
 
-        
+
+
         double del = latticeConstant / 10.0;
         for (double dx = -latticeConstant/2.0; dx < latticeConstant/2.0; dx+= del)
         {
@@ -950,22 +962,29 @@ export struct Func
             {
                 for (double dz = -latticeConstant / 2.0; dz < latticeConstant / 2.0; dz += del)
                 {
-                    std::vector<Point> originalPoints = myPoints;
-                    latticeTranslation(dx,dy,dz);
+                    std::vector<Point> originalPoints = myPoints;//백업
+                    latticeTranslation(dx,dy,dz);//결정구조 평행이동 후 나간 입자 제거 및 빈 공간 다시 채움
                     std::vector<std::array<std::complex<double>, 4>> resultFFT = convertToDensityFuncAndFFT();
-                    double loss = calcMSELossPhaseFFT(resultFFT);
-                    if (loss < minLoss)
+                    double loss = calcMSELossPhaseFFT(resultFFT); //위상 스펙트럼과의 손실함수 계산
+                    if (loss < minLoss)// 가장 낮은 손실함수를 가진 평행이동 벡터를 찾음
                     {
                         minLoss = loss;
                         minVec = { dx,dy,dz };
                     }
-                    myPoints = originalPoints;
-                    std::wprintf(L"FFT : dx: %f, dy: %f, dz: %f\n", dx, dy, dz);
+                    myPoints = originalPoints;//원래 입자 배열로 복귀
+                    std::wprintf(L"FFT is in progress : dx: %f, dy: %f, dz: %f\n", dx, dy, dz);
                 }
             }
         }
 
-        std::wprintf(L"최소 손실을 가지는 평행이동 벡터는 다음과 같다.\n");
+        std::wprintf(L"======================================================================================\n");
+        std::wprintf(L"스펙트럼 분석이 완료되었다.\n");
+        __int64 elapsedSeconds = (getNanoTimer() - startTimeStamp) / 1e9;
+        int hours = elapsedSeconds / 3600;
+        int minutes = (elapsedSeconds % 3600) / 60;
+        int seconds = elapsedSeconds % 60;
+        std::wprintf(L"걸린 시간 : %02d시간 %02d분 %02d초\n", hours, minutes, seconds);
+        std::wprintf(L"스펙트럼 분석이 완료되었다. 최소 손실을 가지는 평행이동 벡터는 다음과 같다.\n");
         std::cout << minVec << std::endl;
         return minVec;
     }

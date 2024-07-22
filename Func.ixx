@@ -15,6 +15,8 @@ import randomRange;
 import utilMath;
 import nanoTimer;
 
+const double degreeToRadian = M_PI / 180.0;
+
 export struct Func
 {
     std::wstring funcName = L"NULL";
@@ -827,70 +829,15 @@ export struct Func
             return;
         }
 
-        std::wprintf(L"%p 함수에 새로운 Fourier reference를 추가했다.\n",this);
-        hasFourierRef = true;
-        fourierRef = convertToDensityFuncAndFFT();
-    }
 
-    double calcMSELossAmpFFT(const std::vector<std::array<std::complex<double>, 4>>& resultFFT)
-    {
-        if (!hasFourierRef)
-        {
-            std::wprintf(L"[Error] 레퍼런스 FFT가 정의되지 않았다.\n");
-            return -1.0;
-        }
-
-        double loss = 0.0;
-        for (int i = 0; i < resultFFT.size(); ++i)
-        {
-            double ampRef = std::abs(fourierRef[i][3]);
-            double ampTgt = std::abs(resultFFT[i][3]);
-            loss += std::pow(ampRef - ampTgt, 2);
-        }
-        return loss / (double)resultFFT.size();
-    }
-
-    double calcMSELossPhaseFFT(const std::vector<std::array<std::complex<double>, 4>>& resultFFT)
-    {
-        if (!hasFourierRef)
-        {
-            std::wprintf(L"[Error] 레퍼런스 FFT가 정의되지 않았다.\n");
-            return -1.0;
-        }
-
-        double loss = 0.0;
-        for (int i = 0; i < resultFFT.size(); ++i)
-        {
-            double phaseRef = std::arg(fourierRef[i][3]);
-            double phaseTgt = std::arg(resultFFT[i][3]);
-            loss += std::pow(phaseRef - phaseTgt, 2);
-        }
-        return loss / (double)resultFFT.size();
-    }
-
-
-    Eigen::Matrix3d getRotationByFFT()
-    {
-        __int64 startTimeStamp = getNanoTimer();
-        if (hasFourierRef == false)
-        {
-            std::wprintf(L"[Error] 참조할 푸리에 변환 값이 존재하지 않는다.\n");
-            return {};
-        }
-
-        double minLoss = std::numeric_limits<double>::max();
-        Eigen::Matrix3d minMat;
-        minMat << 1, 0, 0,
-            0, 1, 0,
-            0, 0, 1;
 
         const int delDegree = 45;
         const double degreeToRadian = M_PI / 180.0;
-        for (int xAngle = 0; xAngle < 360; xAngle+= delDegree)
+        for (int xAngle = 0; xAngle < 360; xAngle += delDegree)
         {
-            for (int yAngle = 0; yAngle < 360; yAngle+= delDegree)
+            for (int yAngle = 0; yAngle < 360; yAngle += delDegree)
             {
-                for (int zAngle = 0; zAngle < 360; zAngle+= delDegree)
+                for (int zAngle = 0; zAngle < 360; zAngle += delDegree)
                 {
                     double xRad = xAngle * degreeToRadian; //x축 회전
                     double yRad = yAngle * degreeToRadian; //y축 회전
@@ -913,16 +860,99 @@ export struct Func
                     Eigen::Matrix3d inputRot = rotZ * rotY * rotX;
                     latticeRotation(inputRot); // 결정구조 회전 후 나간 입자 제거 및 빈 공간은 다시 채움(주기조건)
                     std::vector<std::array<std::complex<double>, 4>> resultFFT = convertToDensityFuncAndFFT();
-                    double loss = calcMSELossAmpFFT(resultFFT); // MSE 손실함수
-                    if (loss < minLoss) // 가장 낮은 손실함수를 가진 회전행렬을 찾음
-                    {
-                        minLoss = loss;
-                        minMat = inputRot;
-                    }
+                    fourierRefAngle[{(double)xAngle, (double)yAngle, (double)zAngle}] = resultFFT;
                     myPoints = originalPoints; //원래 입자 배열로 회귀
-
                     std::wprintf(L"FFT is in progress : xAngle: %d, yAngle: %d, zAngle: %d\n", xAngle, yAngle, zAngle);
                 }
+            }
+        }
+
+        std::wprintf(L"Amplitude spectrum 추가 완료\n", this);
+
+
+        double del = latticeConstant / 10;
+        for (double dx = -latticeConstant / 2.0; dx < latticeConstant / 2.0; dx += del)
+        {
+            for (double dy = -latticeConstant / 2.0; dy < latticeConstant / 2.0; dy += del)
+            {
+                for (double dz = -latticeConstant / 2.0; dz < latticeConstant / 2.0; dz += del)
+                {
+                    std::vector<Point> originalPoints = myPoints;//백업
+                    latticeTranslation(dx, dy, dz);//결정구조 평행이동 후 나간 입자 제거 및 빈 공간 다시 채움
+                    std::vector<std::array<std::complex<double>, 4>> resultFFT = convertToDensityFuncAndFFT();
+                    fourierRefTranslation[{(double)dx, (double)dy, (double)dz}] = resultFFT;
+                    myPoints = originalPoints;//원래 입자 배열로 복귀
+                    std::wprintf(L"FFT is in progress : dx: %f, dy: %f, dz: %f\n", dx, dy, dz);
+                }
+            }
+        }
+
+        std::wprintf(L"Phase spectrum 추가 완료\n", this);
+
+        std::wprintf(L"새로운 Fourier reference가 성공적으로 추가되었다.\n", this);
+        hasFourierRef = true;
+    }
+
+    double calcMSELossAmpFFT(const std::vector<std::array<std::complex<double>, 4>>& firstFFT, const std::vector<std::array<std::complex<double>, 4>>& secondFFT)
+    {
+        if (!hasFourierRef)
+        {
+            std::wprintf(L"[Error] 레퍼런스 FFT가 정의되지 않았다.\n");
+            return -1.0;
+        }
+
+        double loss = 0.0;
+        for (int i = 0; i < firstFFT.size(); ++i)
+        {
+            double ampRef = std::abs(secondFFT[i][3]);
+            double ampTgt = std::abs(firstFFT[i][3]);
+            loss += std::pow(ampRef - ampTgt, 2);
+        }
+        return loss / (double)firstFFT.size();
+    }
+
+    double calcMSELossPhaseFFT(const std::vector<std::array<std::complex<double>, 4>>& firstFFT, const std::vector<std::array<std::complex<double>, 4>>& secondFFT)
+    {
+        if (!hasFourierRef)
+        {
+            std::wprintf(L"[Error] 레퍼런스 FFT가 정의되지 않았다.\n");
+            return -1.0;
+        }
+
+        double loss = 0.0;
+        for (int i = 0; i < firstFFT.size(); ++i)
+        {
+            double phaseRef = std::arg(secondFFT[i][3]);
+            double phaseTgt = std::arg(firstFFT[i][3]);
+            loss += std::pow(phaseRef - phaseTgt, 2);
+        }
+        return loss / (double)firstFFT.size();
+    }
+
+
+    Eigen::Matrix3d getRotationByFFT()
+    {
+        __int64 startTimeStamp = getNanoTimer();
+        if (hasFourierRef == false)
+        {
+            std::wprintf(L"[Error] 참조할 푸리에 변환 값이 존재하지 않는다.\n");
+            return {};
+        }
+
+        double minLoss = std::numeric_limits<double>::max();
+        Point minAngle = { 0,0,0 };
+
+        std::vector<std::array<std::complex<double>, 4>> currentFFT = convertToDensityFuncAndFFT();
+
+        for (auto it = fourierRefAngle.begin(); it != fourierRefAngle.end(); it++)
+        {
+            std::vector<std::array<std::complex<double>, 4>> refFFT = it->second;
+            double loss = calcMSELossAmpFFT(currentFFT, refFFT); // MSE 손실함수
+            if (loss < minLoss) // 가장 낮은 손실함수를 가진 회전행렬을 찾음
+            {
+                minLoss = loss;
+                minAngle = it->first;
+
             }
         }
 
@@ -933,7 +963,26 @@ export struct Func
         int minutes = (elapsedSeconds % 3600) / 60;
         int seconds = elapsedSeconds % 60;
         std::wprintf(L"걸린 시간 : %02d시간 %02d분 %02d초\n", hours, minutes, seconds);
-        std::wprintf(L"최소 손실(loss = %f)을 가지는 회전행렬은 다음과 같다.\n",minLoss);
+        std::wprintf(L"최소 손실(loss = %f)을 가지는 회전행렬은 다음과 같다.\n", minLoss);
+        
+        double xRad = minAngle.x * degreeToRadian; //x축 회전
+        double yRad = minAngle.y * degreeToRadian; //y축 회전
+        double zRad = minAngle.z * degreeToRadian; //z축 회전
+
+        Eigen::Matrix3d rotX, rotY, rotZ;
+        rotX << 1, 0, 0,
+            0, cos(xRad), -sin(xRad),
+            0, sin(xRad), cos(xRad);
+
+        rotY << cos(yRad), 0, sin(yRad),
+            0, 1, 0,
+            -sin(yRad), 0, cos(yRad);
+
+        rotZ << cos(zRad), -sin(zRad), 0,
+            sin(zRad), cos(zRad), 0,
+            0, 0, 1;
+
+        Eigen::Matrix3d minMat = rotZ * rotY * rotX;
         std::cout << minMat << std::endl;
         printRotationMatrix(minMat);
     }
@@ -951,32 +1000,19 @@ export struct Func
         double minLoss = std::numeric_limits<double>::max();
         Eigen::Vector3d minVec;
         minVec << 0, 0, 0;
-        const double pi = 3.14159265358979323846;
-        const double degreeToRadian = pi / 180.0;
 
-
-
-        double del = latticeConstant / 10;
-        for (double dx = -latticeConstant/2.0; dx < latticeConstant/2.0; dx+= del)
+        std::vector<std::array<std::complex<double>, 4>> currentFFT = convertToDensityFuncAndFFT();
+        for (auto it = fourierRefTranslation.begin(); it != fourierRefTranslation.end(); it++)
         {
-            for (double dy = -latticeConstant / 2.0; dy < latticeConstant / 2.0; dy += del)
+            std::vector<std::array<std::complex<double>, 4>> refFFT = it->second;
+            double loss = calcMSELossAmpFFT(currentFFT, refFFT); // MSE 손실함수
+            if (loss < minLoss) // 가장 낮은 손실함수를 가진 회전행렬을 찾음
             {
-                for (double dz = -latticeConstant / 2.0; dz < latticeConstant / 2.0; dz += del)
-                {
-                    std::vector<Point> originalPoints = myPoints;//백업
-                    latticeTranslation(dx,dy,dz);//결정구조 평행이동 후 나간 입자 제거 및 빈 공간 다시 채움
-                    std::vector<std::array<std::complex<double>, 4>> resultFFT = convertToDensityFuncAndFFT();
-                    double loss = calcMSELossPhaseFFT(resultFFT); //위상 스펙트럼과의 손실함수 계산
-                    if (loss < minLoss)// 가장 낮은 손실함수를 가진 평행이동 벡터를 찾음
-                    {
-                        minLoss = loss;
-                        minVec = { dx,dy,dz };
-                    }
-                    myPoints = originalPoints;//원래 입자 배열로 복귀
-                    std::wprintf(L"FFT is in progress : dx: %f, dy: %f, dz: %f\n", dx, dy, dz);
-                }
+                minLoss = loss;
+                minVec = { it->first.x,it->first.y,it->first.z };
             }
         }
+
 
         std::wprintf(L"======================================================================================\n");
         std::wprintf(L"스펙트럼 분석이 완료되었다.\n");
@@ -989,8 +1025,6 @@ export struct Func
         std::cout << minVec << std::endl;
         return minVec;
     }
-
-
 
 };
 

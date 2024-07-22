@@ -1,6 +1,7 @@
 export module globalVar;
 
 import std;
+import Shapes;
 
 // 카메라 변수
 export float camX = 0.0f;
@@ -41,4 +42,5 @@ export std::vector<void*> funcSet;
 export std::wstring graphName = L"NO TITLE";
 
 export bool hasFourierRef = false;
-export std::vector<std::array<std::complex<double>, 4>> fourierRef;
+export std::unordered_map<Point,std::vector<std::array<std::complex<double>, 4>>, decltype(pointHash)> fourierRefAngle;
+export std::unordered_map<Point,std::vector<std::array<std::complex<double>, 4>>, decltype(pointHash)> fourierRefTranslation;

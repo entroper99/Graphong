@@ -53,8 +53,8 @@ export struct Func
 
     double latticeConstant = 0;
 
-    bool hasFourierRef = false;
-    std::vector<std::array<std::complex<double>, 4>> fourierRef;
+    //bool hasFourierRef = false;
+    //std::vector<std::array<std::complex<double>, 4>> fourierRef;
 
     Func(funcFlag inputType) : funcType(inputType) , scalarFunc([](double x, double y, double z) -> double { return 0.0; })
     {
@@ -868,6 +868,7 @@ export struct Func
         return loss / (double)resultFFT.size();
     }
 
+
     Eigen::Matrix3d getRotationByFFT()
     {
         __int64 startTimeStamp = getNanoTimer();
@@ -882,14 +883,14 @@ export struct Func
         minMat << 1, 0, 0,
             0, 1, 0,
             0, 0, 1;
+
+        const int delDegree = 45;
         const double degreeToRadian = M_PI / 180.0;
-
-
-        for (int xAngle = 0; xAngle < 360; xAngle+=15.0) 
+        for (int xAngle = 0; xAngle < 360; xAngle+= delDegree)
         {
-            for (int yAngle = 0; yAngle < 360; yAngle+=15.0) 
+            for (int yAngle = 0; yAngle < 360; yAngle+= delDegree)
             {
-                for (int zAngle = 0; zAngle < 360; zAngle+=15.0) 
+                for (int zAngle = 0; zAngle < 360; zAngle+= delDegree)
                 {
                     double xRad = xAngle * degreeToRadian; //x축 회전
                     double yRad = yAngle * degreeToRadian; //y축 회전
@@ -932,7 +933,7 @@ export struct Func
         int minutes = (elapsedSeconds % 3600) / 60;
         int seconds = elapsedSeconds % 60;
         std::wprintf(L"걸린 시간 : %02d시간 %02d분 %02d초\n", hours, minutes, seconds);
-        std::wprintf(L"스펙트럼 분석이 완료되었다. 최소 손실을 가지는 회전행렬은 다음과 같다.\n");
+        std::wprintf(L"최소 손실(loss = %f)을 가지는 회전행렬은 다음과 같다.\n",minLoss);
         std::cout << minMat << std::endl;
         printRotationMatrix(minMat);
     }
@@ -955,7 +956,7 @@ export struct Func
 
 
 
-        double del = latticeConstant / 10.0;
+        double del = latticeConstant / 10;
         for (double dx = -latticeConstant/2.0; dx < latticeConstant/2.0; dx+= del)
         {
             for (double dy = -latticeConstant / 2.0; dy < latticeConstant / 2.0; dy += del)
@@ -984,7 +985,7 @@ export struct Func
         int minutes = (elapsedSeconds % 3600) / 60;
         int seconds = elapsedSeconds % 60;
         std::wprintf(L"걸린 시간 : %02d시간 %02d분 %02d초\n", hours, minutes, seconds);
-        std::wprintf(L"스펙트럼 분석이 완료되었다. 최소 손실을 가지는 평행이동 벡터는 다음과 같다.\n");
+        std::wprintf(L"최소 손실(loss = %f)을 가지는 평행이동 벡터는 다음과 같다.\n",minLoss);
         std::cout << minVec << std::endl;
         return minVec;
     }

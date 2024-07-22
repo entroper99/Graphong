@@ -40,3 +40,5 @@ export std::vector<void*> funcSet;
 
 export std::wstring graphName = L"NO TITLE";
 
+export bool hasFourierRef = false;
+export std::vector<std::array<std::complex<double>, 4>> fourierRef;

@@ -413,6 +413,25 @@ export struct Func
         scalar = newScalar;
     }
 
+    void rotation(std::vector<Point>& inputPoints, Eigen::Matrix3d inputMat)
+    {
+        for (int i = 0; i < inputPoints.size(); i++)
+        {
+            double originX = inputPoints[i].x;
+            double originY = inputPoints[i].y;
+            double originZ = inputPoints[i].z;
+
+            Eigen::Vector3d vec3;
+            vec3 << originX, originY, originZ;
+
+            Eigen::Vector3d resultVec = inputMat * vec3;
+
+            inputPoints[i].x = resultVec[0];
+            inputPoints[i].y = resultVec[1];
+            inputPoints[i].z = resultVec[2];
+        }
+    }
+
     void translation(double inputX, double inputY, double inputZ)
     {
         std::unordered_map<Point, double, decltype(pointHash)> newScalar;
@@ -430,6 +449,20 @@ export struct Func
             if (funcType == funcFlag::scalarField) newScalar[{myPoints[i].x, myPoints[i].y, myPoints[i].z}] = scalar[{originX, originY, originZ}];
         }
         scalar = newScalar;
+    }
+
+    void translation(std::vector<Point>& inputPoints, Eigen::Vector3d inputVec)
+    {
+        for (int i = 0; i < myPoints.size(); i++)
+        {
+            double originX = inputPoints[i].x;
+            double originY = inputPoints[i].y;
+            double originZ = inputPoints[i].z;
+
+            inputPoints[i].x += inputVec[0];
+            inputPoints[i].y += inputVec[1];
+            inputPoints[i].z += inputVec[2];
+        }
     }
 
     void scalarCalc()
@@ -490,39 +523,20 @@ export struct Func
         return count;
     }
 
-    void eraseExternalLattice()
+    void eraseExternalLattice(std::vector<Point>& inputPoints, double inputLatticeConstant)
     {
-        //std::wprintf(L"격자상수 외부의 원자들을 전부 제거합니다.\n");
-        if (latticeConstant == 0)
-        {
-            std::wprintf(L"[Error] 격자상수가 정의되어있지 않다.\n");
-            return;
-        }
-
-        int originNumber = myPoints.size();
-
-        auto it = std::remove_if(myPoints.begin(), myPoints.end(), [this](const Point& p) 
+        auto it = std::remove_if(inputPoints.begin(), inputPoints.end(), [=](const Point& p)
             {
-            return std::abs(p.x) > latticeConstant / 2.0 || std::abs(p.y) > latticeConstant / 2.0 || std::abs(p.z) > latticeConstant / 2.0;
+                return std::abs(p.x) > inputLatticeConstant / 2.0 || std::abs(p.y) > inputLatticeConstant / 2.0 || std::abs(p.z) > inputLatticeConstant / 2.0;
             }
         );
-        myPoints.erase(it, myPoints.end());
-        //std::wprintf(L"[eraseEternalCrystal] %d개의 입자가 제거되었다.\n",  originNumber - countPointsWithinLattice());
+        inputPoints.erase(it, inputPoints.end());
     }
 
-    void latticeDuplicate()
+    void latticeDuplicate(std::vector<Point>& inputPoints, double inputLatticeConstant)
     {
-        //std::wprintf(L"주변 26개의 결정구조 복사를 시작합니다.\n");
-        if (latticeConstant == 0)
-        {
-            std::wprintf(L"[Error] 격자상수가 정의되어있지 않다.\n");
-            return;
-        }
-
-        eraseExternalLattice();
-
         std::vector<Point> newMyPoints;
-        for (const auto& point : myPoints)
+        for (const auto& point : inputPoints)
         {
             for (int dx = -1; dx <= 1; dx++)
             {
@@ -539,47 +553,24 @@ export struct Func
                 }
             }
         }
-
-        myPoints = newMyPoints;
+        inputPoints = newMyPoints;
     }
 
-    void latticeRotation(Eigen::Matrix3d inputMatrix)
+
+    void latticeRotation(std::vector<Point>& inputPoints, double inputLatticeConstant, Eigen::Matrix3d inputMatrix)
     {
-        //std::wprintf(L"결정구조 회전을 시작합니다.");
-        if (latticeConstant == 0)
-        {
-            std::wprintf(L"격자상수가 정의되어있지 않다.");
-            return;
-        }
-        eraseExternalLattice();
-        latticeDuplicate();
-
-        Eigen::Matrix3d rotationMatrix = inputMatrix;
-        rotation(rotationMatrix);
-        eraseExternalLattice();
-
-        //std::wprintf(L"[latticeRotation] %d개의 입자가 결정구조 내에 존재한다.\n", countPointsWithinLattice());
-        scalarCalc();
-        //std::wprintf(L"\033[0;33m이 함수의 평균 f값은 %f이다.\033[0m\n", scalarSquareAvg());
+        eraseExternalLattice(inputPoints, inputLatticeConstant);
+        latticeDuplicate(inputPoints, inputLatticeConstant);
+        rotation(inputPoints, inputMatrix);
+        eraseExternalLattice(inputPoints, inputLatticeConstant);
     }
 
-    void latticeTranslation(double compX, double compY, double compZ)
+    void latticeTranslation(std::vector<Point>& inputPoints, double inputLatticeConstant, Eigen::Vector3d inputVector)
     {
-        //std::wprintf(L"결정구조 평행이동을 시작합니다.");
-        if (latticeConstant == 0)
-        {
-            std::wprintf(L"[Error] 격자상수가 정의되어있지 않다.");
-            return;
-        }
-        eraseExternalLattice();
-        latticeDuplicate();
-
-        translation(compX, compY, compZ);
-        eraseExternalLattice();
-
-        //std::wprintf(L"[latticeTranslation] %d개의 입자가 결정구조 내에 존재한다.\n", countPointsWithinLattice());
-        scalarCalc();
-        //std::wprintf(L"\033[0;33m이 함수의 평균 f값은 %f이다.\033[0m\n", scalarSquareAvg());
+        eraseExternalLattice(inputPoints, inputLatticeConstant);
+        latticeDuplicate(inputPoints, inputLatticeConstant);
+        translation(inputPoints, inputVector);
+        eraseExternalLattice(inputPoints, inputLatticeConstant);
     }
 
     void sortByCOM()
@@ -713,50 +704,47 @@ export struct Func
         {
         }
 
-        latticeDuplicate();
-        rotation(rotMat);
-        eraseExternalLattice();
+        latticeDuplicate(myPoints,latticeConstant);
+        rotation(myPoints, rotMat);
+        eraseExternalLattice(myPoints, latticeConstant);
         printRotationMatrix(rotMat);
         scalarCalc();
         //std::wprintf(L"\033[0;33m이 함수의 평균 f값은 %f이다.\033[0m\n", scalarSquareAvg());
     }
 
-    std::vector<std::array<std::complex<double>, 4>> convertToDensityFuncAndFFT()
+    std::vector<std::array<std::complex<double>, 4>> convertToDensityFuncAndFFT(const std::vector<Point>& inputPoints, double inputLatticeConstant, int inputGridSize)
     {
-        if (latticeConstant == 0)
-        {
-            std::wprintf(L"[Error] 시뮬레이션 박스(격자상수)가 정의되지 않은 상태에서는 밀도함수를 만들 수 없다.\n");
-            return {};
-        }
-
         double gaussAmp = 1.0;
         double gaussSig = 1.0;
         std::vector<std::array<double, 4>> densityFunc;
-        double del = latticeConstant / (DENSITY_GRID - 1);
-        int gridSize = DENSITY_GRID * DENSITY_GRID * DENSITY_GRID;
+        double del = inputLatticeConstant / (inputGridSize - 1);
+        int gridSize = inputGridSize * inputGridSize * inputGridSize;
 
-        Eigen::Tensor<double, 3> density(DENSITY_GRID, DENSITY_GRID, DENSITY_GRID);
+        Eigen::Tensor<double, 3> density(inputGridSize, inputGridSize, inputGridSize);
         density.setZero();
 
         int idx = 0;
-        for (double tgtX = -latticeConstant / 2.0; tgtX <= latticeConstant / 2.0; tgtX += del)
+        for (double tgtX = -inputLatticeConstant / 2.0; tgtX <= inputLatticeConstant / 2.0; tgtX += del)
         {
-            for (double tgtY = -latticeConstant / 2.0; tgtY <= latticeConstant / 2.0; tgtY += del)
+            for (double tgtY = -inputLatticeConstant / 2.0; tgtY <= inputLatticeConstant / 2.0; tgtY += del)
             {
-                for (double tgtZ = -latticeConstant / 2.0; tgtZ <= latticeConstant / 2.0; tgtZ += del)
+                for (double tgtZ = -inputLatticeConstant / 2.0; tgtZ <= inputLatticeConstant / 2.0; tgtZ += del)
                 {
                     double densityValue = 0;
-                    for (const auto& point : myPoints)
+                    for (const auto& point : inputPoints)
                     {
                         densityValue += calcGaussian(point.x - tgtX, point.y - tgtY, point.z - tgtZ, gaussSig, gaussAmp);
                     }
-                    int xIdx = std::round((tgtX + latticeConstant / 2.0) / del);
-                    int yIdx = std::round((tgtY + latticeConstant / 2.0) / del);
-                    int zIdx = std::round((tgtZ + latticeConstant / 2.0) / del);
+                    int xIdx = std::round((tgtX + inputLatticeConstant / 2.0) / del);
+                    int yIdx = std::round((tgtY + inputLatticeConstant / 2.0) / del);
+                    int zIdx = std::round((tgtZ + inputLatticeConstant / 2.0) / del);
                     density(xIdx, yIdx, zIdx) = densityValue;
                 }
             }
         }
+
+        //Eigen::Tensor<double, 3> windowFunc = createHammingWindow(inputGridSize);
+        //density = density * windowFunc;
 
         fftw_complex* input, * output;
         fftw_plan p;
@@ -771,11 +759,11 @@ export struct Func
         }
 
         idx = 0;
-        for (int x = 0; x < DENSITY_GRID; ++x)
+        for (int x = 0; x < inputGridSize; ++x)
         {
-            for (int y = 0; y < DENSITY_GRID; ++y)
+            for (int y = 0; y < inputGridSize; ++y)
             {
-                for (int z = 0; z < DENSITY_GRID; ++z)
+                for (int z = 0; z < inputGridSize; ++z)
                 {
                     input[idx][0] = density(x, y, z);//실수
                     input[idx][1] = 0.0;//허수
@@ -784,30 +772,29 @@ export struct Func
             }
         }
 
-        p = fftw_plan_dft_3d(DENSITY_GRID, DENSITY_GRID, DENSITY_GRID, input, output, FFTW_FORWARD, FFTW_ESTIMATE);
+        p = fftw_plan_dft_3d(inputGridSize, inputGridSize, inputGridSize, input, output, FFTW_FORWARD, FFTW_ESTIMATE);
         fftw_execute(p);
 
         double delta_x = del;
         double delta_y = del;
         double delta_z = del;
 
-
         std::vector<std::array<std::complex<double>, 4>> fourierResult;
-        for (int x = 0; x < DENSITY_GRID; ++x)
+        for (int x = 0; x < inputGridSize; ++x)
         {
-            for (int y = 0; y < DENSITY_GRID; ++y)
+            for (int y = 0; y < inputGridSize; ++y)
             {
-                for (int z = 0; z < DENSITY_GRID; ++z)
+                for (int z = 0; z < inputGridSize; ++z)
                 {
-                    int i = z * DENSITY_GRID * DENSITY_GRID + y * DENSITY_GRID + x;
+                    int i = z * inputGridSize * inputGridSize + y * inputGridSize + x;
 
-                    int kx = (x <= DENSITY_GRID / 2) ? x : x - DENSITY_GRID;
-                    int ky = (y <= DENSITY_GRID / 2) ? y : y - DENSITY_GRID;
-                    int kz = (z <= DENSITY_GRID / 2) ? z : z - DENSITY_GRID;
+                    int kx = (x <= inputGridSize / 2) ? x : x - inputGridSize;
+                    int ky = (y <= inputGridSize / 2) ? y : y - inputGridSize;
+                    int kz = (z <= inputGridSize / 2) ? z : z - inputGridSize;
 
-                    double fx = kx / (DENSITY_GRID * delta_x);
-                    double fy = ky / (DENSITY_GRID * delta_y);
-                    double fz = kz / (DENSITY_GRID * delta_z);
+                    double fx = kx / (inputGridSize * delta_x);
+                    double fy = ky / (inputGridSize * delta_y);
+                    double fz = kz / (inputGridSize * delta_z);
 
                     std::complex<double> complexVal(output[i][0], output[i][1]);
                     fourierResult.push_back({ std::complex<double>(kx, 0), std::complex<double>(ky, 0), std::complex<double>(kz, 0), complexVal });
@@ -828,8 +815,6 @@ export struct Func
             std::wprintf(L"[Error] 격자상수가 정의되지 않았다.\n");
             return;
         }
-
-
 
         const int delDegree = 45;
         const double degreeToRadian = M_PI / 180.0;
@@ -856,12 +841,11 @@ export struct Func
                         sin(zRad), cos(zRad), 0,
                         0, 0, 1;
 
-                    std::vector<Point> originalPoints = myPoints;//백업
+                    std::vector<Point> targetPoints = myPoints;//백업
                     Eigen::Matrix3d inputRot = rotZ * rotY * rotX;
-                    latticeRotation(inputRot); // 결정구조 회전 후 나간 입자 제거 및 빈 공간은 다시 채움(주기조건)
-                    std::vector<std::array<std::complex<double>, 4>> resultFFT = convertToDensityFuncAndFFT();
-                    fourierRefAngle[{(double)xAngle, (double)yAngle, (double)zAngle}] = resultFFT;
-                    myPoints = originalPoints; //원래 입자 배열로 회귀
+                    latticeRotation(targetPoints, latticeConstant, inputRot); // 결정구조 회전 후 나간 입자 제거 및 빈 공간은 다시 채움(주기조건)
+                    std::vector<std::array<std::complex<double>, 4>> resultFFT = convertToDensityFuncAndFFT(targetPoints, latticeConstant, DENSITY_GRID);
+                    fourierAngleSave.push_back({ {(double)xAngle, (double)yAngle, (double)zAngle} ,resultFFT });
                     std::wprintf(L"FFT is in progress : xAngle: %d, yAngle: %d, zAngle: %d\n", xAngle, yAngle, zAngle);
                 }
             }
@@ -877,11 +861,10 @@ export struct Func
             {
                 for (double dz = -latticeConstant / 2.0; dz < latticeConstant / 2.0; dz += del)
                 {
-                    std::vector<Point> originalPoints = myPoints;//백업
-                    latticeTranslation(dx, dy, dz);//결정구조 평행이동 후 나간 입자 제거 및 빈 공간 다시 채움
-                    std::vector<std::array<std::complex<double>, 4>> resultFFT = convertToDensityFuncAndFFT();
-                    fourierRefTranslation[{(double)dx, (double)dy, (double)dz}] = resultFFT;
-                    myPoints = originalPoints;//원래 입자 배열로 복귀
+                    std::vector<Point> targetPoints = myPoints;//백업
+                    latticeTranslation(targetPoints, latticeConstant, { dx, dy, dz });//결정구조 평행이동 후 나간 입자 제거 및 빈 공간 다시 채움
+                    std::vector<std::array<std::complex<double>, 4>> resultFFT = convertToDensityFuncAndFFT(targetPoints, latticeConstant, DENSITY_GRID);
+                    fourierTransSave.push_back({ {(double)dx, (double)dy, (double)dz} ,resultFFT });
                     std::wprintf(L"FFT is in progress : dx: %f, dy: %f, dz: %f\n", dx, dy, dz);
                 }
             }
@@ -942,17 +925,15 @@ export struct Func
         double minLoss = std::numeric_limits<double>::max();
         Point minAngle = { 0,0,0 };
 
-        std::vector<std::array<std::complex<double>, 4>> currentFFT = convertToDensityFuncAndFFT();
-
-        for (auto it = fourierRefAngle.begin(); it != fourierRefAngle.end(); it++)
+        std::vector<std::array<std::complex<double>, 4>> currentFFT = convertToDensityFuncAndFFT(myPoints,latticeConstant,DENSITY_GRID);
+        for (int i = 0; i < fourierAngleSave.size(); i++)
         {
-            std::vector<std::array<std::complex<double>, 4>> refFFT = it->second;
+            std::vector<std::array<std::complex<double>, 4>> refFFT = fourierAngleSave[i].second;
             double loss = calcMSELossAmpFFT(currentFFT, refFFT); // MSE 손실함수
             if (loss < minLoss) // 가장 낮은 손실함수를 가진 회전행렬을 찾음
             {
                 minLoss = loss;
-                minAngle = it->first;
-
+                minAngle = { fourierAngleSave[i].first.x,fourierAngleSave[i].first.y,fourierAngleSave[i].first.z };
             }
         }
 
@@ -1001,18 +982,17 @@ export struct Func
         Eigen::Vector3d minVec;
         minVec << 0, 0, 0;
 
-        std::vector<std::array<std::complex<double>, 4>> currentFFT = convertToDensityFuncAndFFT();
-        for (auto it = fourierRefTranslation.begin(); it != fourierRefTranslation.end(); it++)
+        std::vector<std::array<std::complex<double>, 4>> currentFFT = convertToDensityFuncAndFFT(myPoints,latticeConstant,DENSITY_GRID);
+        for (int i = 0; i < fourierTransSave.size(); i++)
         {
-            std::vector<std::array<std::complex<double>, 4>> refFFT = it->second;
+            std::vector<std::array<std::complex<double>, 4>> refFFT = fourierTransSave[i].second;
             double loss = calcMSELossAmpFFT(currentFFT, refFFT); // MSE 손실함수
             if (loss < minLoss) // 가장 낮은 손실함수를 가진 회전행렬을 찾음
             {
                 minLoss = loss;
-                minVec = { it->first.x,it->first.y,it->first.z };
+                minVec = { fourierTransSave[i].first.x,fourierTransSave[i].first.y,fourierTransSave[i].first.z };
             }
         }
-
 
         std::wprintf(L"======================================================================================\n");
         std::wprintf(L"스펙트럼 분석이 완료되었다.\n");
@@ -1026,6 +1006,24 @@ export struct Func
         return minVec;
     }
 
+    Eigen::Tensor<double, 3> createHammingWindow(int gridSize)
+    {
+        Eigen::Tensor<double, 3> hammingWindow(gridSize, gridSize, gridSize);
+        for (int i = 0; i < gridSize; ++i)
+        {
+            for (int j = 0; j < gridSize; ++j)
+            {
+                for (int k = 0; k < gridSize; ++k)
+                {
+                    double wx = 0.54 - 0.46 * std::cos(2 * M_PI * i / (gridSize - 1));
+                    double wy = 0.54 - 0.46 * std::cos(2 * M_PI * j / (gridSize - 1));
+                    double wz = 0.54 - 0.46 * std::cos(2 * M_PI * k / (gridSize - 1));
+                    hammingWindow(i, j, k) = wx * wy * wz;
+                }
+            }
+        }
+        return hammingWindow;
+    }
 };
 
 

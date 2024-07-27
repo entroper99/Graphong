@@ -165,8 +165,6 @@ int main(int argc, char** argv)
             std::wprintf(L"\033[0;33m31.결정구조 Rotaiton \033[0m\n");
             std::wprintf(L"\033[0;33m32.결정구조 Translation \033[0m\n");
             std::wprintf(L"\033[0;33m33.Sort by PCA \033[0m\n");
-            std::wprintf(L"\033[0;33m34.연속평행이동 \033[0m\n");
-            std::wprintf(L"\033[0;33m35.결정구조 밀도함수 변환 및 FFT\033[0m\n");
             std::wprintf(L"\033[0;33m36.푸리에변환 레퍼런스 입력\033[0m\n");
             std::wprintf(L"\033[0;33m37.푸리에변환 Amplitude Spectrum 회전행렬 구하기\033[0m\n");
             std::wprintf(L"\033[0;33m38.푸리에변환 Phase Spectrum 평행이동벡터 구하기\033[0m\n");
@@ -1038,7 +1036,9 @@ int main(int argc, char** argv)
                 std::wprintf(L"입력이 완료되었다.\n");
                 std::wprintf(L"다음 행렬로 rotation을 진행합니다.\n");
                 printRotationMatrix(inputMatrix);
-                ((Func*)funcSet[dataIndex])->latticeRotation(inputMatrix);
+
+                Func* tgtFunc = ((Func*)funcSet[dataIndex]);
+                tgtFunc->latticeRotation(tgtFunc->myPoints, tgtFunc->latticeConstant,inputMatrix);
             }
             else if (input == 32)
             {
@@ -1064,7 +1064,8 @@ int main(int argc, char** argv)
                 std::wprintf(L"다음 벡터로 tranlsation을 진행합니다.\n");
                 std::wprintf(L"Vector : { %f, %f, %f }\n", compX, compY, compZ);
 
-                ((Func*)funcSet[dataIndex])->latticeTranslation(compX, compY, compZ);
+                Func* tgtFunc = ((Func*)funcSet[dataIndex]);
+                tgtFunc->latticeTranslation(tgtFunc->myPoints, tgtFunc->latticeConstant,{ compX, compY, compZ });
             }
             else if (input == 33)
             {
@@ -1076,54 +1077,6 @@ int main(int argc, char** argv)
                     std::cin >> dataIndex;
                 }
                 ((Func*)funcSet[dataIndex])->sortByPCA();
-            }
-            else if (input == 34)//평행이동 자동화
-            {
-
-                int dataIndex = 0;
-                if (funcSet.size() > 1)
-                {
-                    std::wprintf(L"몇번째 데이터에 연속 평행이동을 할까? (0 ~ %d).\n", funcSet.size() - 1);
-                    prtFuncName();
-                    std::cin >> dataIndex;
-                }
-                double del, max;
-                std::wprintf(L"데이터의 평행이동 간격을 몇으로 할까?\n");
-                std::cin >> del;
-                std::wprintf(L"데이터의 최대 평행이동 값을 몇으로 할까?\n");
-                std::cin >> max;
-
-                std::vector<std::array<double, 2>> result;
-                for (double i = 0; i < max; i += del)
-                {
-                    ((Func*)funcSet[dataIndex])->latticeTranslation(del, 0, 0);
-                    result.push_back({ i,((Func*)funcSet[dataIndex])->scalarAvg() });
-                }
-
-                for (int i = 0; i < result.size(); i++)
-                {
-                    std::wprintf(L"%f, %f\n", result[i][0], result[i][1]);
-                }
-
-                for (int i = funcSet.size()-1; i >= 0; i--)
-                {
-                    delete (Func*)funcSet[i];
-                }
-                funcSet.clear();
-
-                Func* tgtFunc = new Func(funcFlag::dim2);
-                for (int i = 0; i < result.size(); i++) tgtFunc->myPoints.push_back({ result[i][0], result[i][1] });
-            }
-            else if (input == 35)
-            {
-                int dataIndex = 0;
-                if (funcSet.size() > 1)
-                {
-                    std::wprintf(L"몇번째 데이터에 연속 평행이동을 할까? (0 ~ %d).\n", funcSet.size() - 1);
-                    prtFuncName();
-                    std::cin >> dataIndex;
-                }
-                ((Func*)funcSet[dataIndex])->convertToDensityFuncAndFFT();
             }
             else if (input == 36)
             {

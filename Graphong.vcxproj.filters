@@ -57,5 +57,8 @@
     <ClCompile Include="nanoTimer.ixx">
       <Filter>소스 파일</Filter>
     </ClCompile>
+    <ClCompile Include="ThreadPool.ixx">
+      <Filter>소스 파일</Filter>
+    </ClCompile>
   </ItemGroup>
 </Project>

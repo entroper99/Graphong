@@ -42,5 +42,6 @@ export std::vector<void*> funcSet;
 export std::wstring graphName = L"NO TITLE";
 
 export bool hasFourierRef = false;
-export std::unordered_map<Point,std::vector<std::array<std::complex<double>, 4>>, decltype(pointHash)> fourierRefAngle;
-export std::unordered_map<Point,std::vector<std::array<std::complex<double>, 4>>, decltype(pointHash)> fourierRefTranslation;
+
+export std::vector<std::pair<Point, std::vector<std::array<std::complex<double>, 4>>>> fourierAngleSave;
+export std::vector<std::pair<Point, std::vector<std::array<std::complex<double>, 4>>>> fourierTransSave;

@@ -188,3 +188,4 @@ export namespace lowCol
 
 export constexpr double BOX_SIZE = 10.849215;
 export constexpr int DENSITY_GRID = 20;
+export constexpr double DEGREE_TO_RADIAN = M_PI / 180.0;

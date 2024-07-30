@@ -10,3 +10,10 @@ export int randomRange(int a, int b)
 	std::uniform_int_distribution<int> dis(a, b);
 	return dis(gen);
 }
+
+
+export double randomRangeFloat(double a, double b)
+{
+    std::uniform_real_distribution<double> dis(a, b);
+    return dis(gen);
+}

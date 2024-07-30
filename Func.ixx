@@ -14,8 +14,8 @@ import Shapes;
 import randomRange;
 import utilMath;
 import nanoTimer;
+import ThreadPool;
 
-const double degreeToRadian = M_PI / 180.0;
 
 export struct Func
 {
@@ -41,8 +41,6 @@ export struct Func
     bool deleteSupertri = false;
     bool triFirstRun = true;
 
-    inline static bool hasTransform = false;
-    
     inline static bool hasTranslation = false;
     inline static bool hasRotation = false;
     inline static Eigen::Vector3d transVec;
@@ -291,105 +289,6 @@ export struct Func
         }
     };
 
-    void invariablize(double inputPeriod)
-    {
-        std::wprintf(L"표준화 실행 전의 평균 f값은 %f이다.\n", scalarSquareAvg());
-
-        //고유 스칼라 함수 변경
-        // 
-        //period = inputPeriod;
-        //double scaleFactor = 2.0 * M_PI / period;
-        //scalarFunc = [=](double x, double y, double z)->double
-        //    {
-        //        return (std::cos(scaleFactor * x) * std::sin(scaleFactor * y) * std::sin(2 * (scaleFactor * z)) + std::cos(scaleFactor * y) * std::sin(scaleFactor * z) * std::sin(2 * (scaleFactor * x)) + std::cos(scaleFactor * z) * std::sin(scaleFactor * x) * std::sin(2 * (scaleFactor * y)));
-        //    };
-
-
-        if (hasTransform == false)
-        {
-            //중심점 계산
-            double totalX = 0, totalY = 0, totalZ = 0;
-            for (const auto& point : myPoints)
-            {
-                totalX += point.x;
-                totalY += point.y;
-                totalZ += point.z;
-            }
-            double centerX = totalX / myPoints.size();
-            double centerY = totalY / myPoints.size();
-            double centerZ = totalZ / myPoints.size();
-
-
-            //데이터를 원점을 기준으로 변경
-            for (int i = 0; i < myPoints.size(); i++)
-            {
-                myPoints[i].x -= centerX;
-                myPoints[i].y -= centerY;
-                myPoints[i].z -= centerZ;
-            }
-
-
-            Eigen::MatrixXd matX;
-            matX.resize(myPoints.size(), 3);
-
-            for (int row = 0; row < myPoints.size(); row++)
-            {
-                matX(row, 0) = myPoints[row].x;
-                matX(row, 1) = myPoints[row].y;
-                matX(row, 2) = myPoints[row].z;
-            }
-
-            Eigen::MatrixXd matXT = matX.transpose();
-            Eigen::MatrixXd matCov = (1.0 / (double)myPoints.size()) * (matXT * matX);
-
-            Eigen::SelfAdjointEigenSolver<Eigen::MatrixXd> solver(matCov);
-            Eigen::VectorXd eigenvalues = solver.eigenvalues();
-            Eigen::MatrixXd eigenvectors = solver.eigenvectors();
-
-            std::cout << "Eigenvalues " << ":\n" << eigenvalues << "\n\n";
-            for (int i = 0; i < eigenvectors.cols(); ++i)
-            {
-                std::cout << "Eigenvector " << i + 1 << ":\n" << eigenvectors.col(i) << "\n\n";
-            }
-
-            double maxVal = eigenvalues[0];
-            int maxIndex = 0;
-
-            for (int i = 1; i < eigenvalues.size(); ++i)
-            {
-                double currentVal = eigenvalues[i];
-                if (currentVal > maxVal)
-                {
-                    maxVal = currentVal;
-                    maxIndex = i;
-                }
-            }
-
-            Eigen::Matrix3d tgtMat;
-            tgtMat = eigenvectors;
-
-            Eigen::Matrix3d originMat;
-            originMat << -0.743409, -0.368947, -0.557872,
-                0.242377, 0.62879, -0.738835,
-                0.623375, -0.684472, -0.378024;
-
-            Eigen::Matrix3d rotationMat = originMat * tgtMat.inverse();
-
-            hasTransform = true;
-            transVec = { -centerX,-centerY,-centerZ };
-            rotMat = rotationMat;
-        }
-
-        std::cout << "\n평행이동 벡터" << ":\n" << transVec << "\n\n";
-        std::cout << "\n회전행렬 " << ":\n" << rotMat << "\n\n";
-        rotation(rotMat);
-        printRotationMatrix(rotMat);
-
-        scalarCalc();
-        std::wprintf(L"표준화를 완료하였다.\n");
-        std::wprintf(L"\033[0;33m이 함수의 표준화 후 평균 f값은 %f이다.\033[0m\n", scalarSquareAvg());
-    }
-
     void rotation(Eigen::Matrix3d inputMat)
     {
         std::unordered_map<Point, double, decltype(pointHash)> newScalar;
@@ -417,15 +316,8 @@ export struct Func
     {
         for (int i = 0; i < inputPoints.size(); i++)
         {
-            double originX = inputPoints[i].x;
-            double originY = inputPoints[i].y;
-            double originZ = inputPoints[i].z;
-
-            Eigen::Vector3d vec3;
-            vec3 << originX, originY, originZ;
-
+            Eigen::Vector3d vec3 = { inputPoints[i].x, inputPoints[i].y, inputPoints[i].z };
             Eigen::Vector3d resultVec = inputMat * vec3;
-
             inputPoints[i].x = resultVec[0];
             inputPoints[i].y = resultVec[1];
             inputPoints[i].z = resultVec[2];
@@ -555,7 +447,6 @@ export struct Func
         }
         inputPoints = newMyPoints;
     }
-
 
     void latticeRotation(std::vector<Point>& inputPoints, double inputLatticeConstant, Eigen::Matrix3d inputMatrix)
     {
@@ -743,14 +634,14 @@ export struct Func
             }
         }
 
-        //Eigen::Tensor<double, 3> windowFunc = createHammingWindow(inputGridSize);
-        //density = density * windowFunc;
+        Eigen::Tensor<double, 3> windowFunc = createHammingWindow(inputGridSize);
+        density = density * windowFunc;
 
         fftw_complex* input, * output;
         fftw_plan p;
         input = (fftw_complex*)fftw_malloc(sizeof(fftw_complex) * gridSize);
         output = (fftw_complex*)fftw_malloc(sizeof(fftw_complex) * gridSize);
-        if (!input || !output) 
+        if (!input || !output)
         {
             std::wprintf(L"[FFT] 메모리 할당 실패\n");
             if (input) fftw_free(input);
@@ -801,7 +692,7 @@ export struct Func
                 }
             }
         }
-        
+
         fftw_destroy_plan(p);
         fftw_free(input);
         fftw_free(output);
@@ -816,65 +707,85 @@ export struct Func
             return;
         }
 
-        const int delDegree = 45;
-        const double degreeToRadian = M_PI / 180.0;
+        __int64 startRotateTime = getNanoTimer();
+
+
+        const int delDegree = 15;
+        ThreadPool threadPool(std::thread::hardware_concurrency());
+        std::mutex fourierAngleSaveMutex;
+        std::mutex fourierTransSaveMutex;
+
         for (int xAngle = 0; xAngle < 360; xAngle += delDegree)
         {
             for (int yAngle = 0; yAngle < 360; yAngle += delDegree)
             {
                 for (int zAngle = 0; zAngle < 360; zAngle += delDegree)
                 {
-                    double xRad = xAngle * degreeToRadian; //x축 회전
-                    double yRad = yAngle * degreeToRadian; //y축 회전
-                    double zRad = zAngle * degreeToRadian; //z축 회전
-
-                    Eigen::Matrix3d rotX, rotY, rotZ;
-                    rotX << 1, 0, 0,
-                        0, cos(xRad), -sin(xRad),
-                        0, sin(xRad), cos(xRad);
-
-                    rotY << cos(yRad), 0, sin(yRad),
-                        0, 1, 0,
-                        -sin(yRad), 0, cos(yRad);
-
-                    rotZ << cos(zRad), -sin(zRad), 0,
-                        sin(zRad), cos(zRad), 0,
-                        0, 0, 1;
-
-                    std::vector<Point> targetPoints = myPoints;//백업
-                    Eigen::Matrix3d inputRot = rotZ * rotY * rotX;
-                    latticeRotation(targetPoints, latticeConstant, inputRot); // 결정구조 회전 후 나간 입자 제거 및 빈 공간은 다시 채움(주기조건)
-                    std::vector<std::array<std::complex<double>, 4>> resultFFT = convertToDensityFuncAndFFT(targetPoints, latticeConstant, DENSITY_GRID);
-                    fourierAngleSave.push_back({ {(double)xAngle, (double)yAngle, (double)zAngle} ,resultFFT });
-                    std::wprintf(L"FFT is in progress : xAngle: %d, yAngle: %d, zAngle: %d\n", xAngle, yAngle, zAngle);
+                    
+                    threadPool.addTask([this, xAngle, yAngle, zAngle,&fourierAngleSaveMutex]()
+                        {
+                            Eigen::Matrix3d inputRot = angleToMatrix(xAngle, yAngle, zAngle);
+                            std::vector<Point> targetPoints = myPoints; // 백업
+                            latticeRotation(targetPoints, latticeConstant, inputRot); // 결정구조 회전 후 나간 입자 제거 및 빈 공간은 다시 채움(주기조건)
+                            std::vector<std::array<std::complex<double>, 4>> resultFFT = convertToDensityFuncAndFFT(targetPoints, latticeConstant, DENSITY_GRID);
+                            {
+                                std::unique_lock<std::mutex> lock(fourierAngleSaveMutex);  // 수정
+                                fourierAngleSave.push_back({ {(double)xAngle, (double)yAngle, (double)zAngle}, resultFFT });
+                            }
+                        });
                 }
             }
         }
+        threadPool.waitForThreads();
 
-        std::wprintf(L"Amplitude spectrum 추가 완료\n", this);
+        std::wprintf(L"Amplitude spectrum 추가 완료\n");
+        {
+            __int64 elapsedSeconds = (getNanoTimer() - startRotateTime) / 1e9;
+            int hours = elapsedSeconds / 3600;
+            int minutes = (elapsedSeconds % 3600) / 60;
+            int seconds = elapsedSeconds % 60;
+            std::wprintf(L"회전 저장에 걸린 시간 : %02d시간 %02d분 %02d초\n", hours, minutes, seconds);
+        }
 
+        __int64 startTransTime = getNanoTimer();
 
-        double del = latticeConstant / 10;
+        double del = latticeConstant / 20;
+
         for (double dx = -latticeConstant / 2.0; dx < latticeConstant / 2.0; dx += del)
         {
             for (double dy = -latticeConstant / 2.0; dy < latticeConstant / 2.0; dy += del)
             {
                 for (double dz = -latticeConstant / 2.0; dz < latticeConstant / 2.0; dz += del)
                 {
-                    std::vector<Point> targetPoints = myPoints;//백업
-                    latticeTranslation(targetPoints, latticeConstant, { dx, dy, dz });//결정구조 평행이동 후 나간 입자 제거 및 빈 공간 다시 채움
-                    std::vector<std::array<std::complex<double>, 4>> resultFFT = convertToDensityFuncAndFFT(targetPoints, latticeConstant, DENSITY_GRID);
-                    fourierTransSave.push_back({ {(double)dx, (double)dy, (double)dz} ,resultFFT });
-                    std::wprintf(L"FFT is in progress : dx: %f, dy: %f, dz: %f\n", dx, dy, dz);
+                    threadPool.addTask([this, dx, dy, dz, &fourierTransSaveMutex]()
+                        {
+                            std::vector<Point> targetPoints = myPoints; // 백업
+                            latticeTranslation(targetPoints, latticeConstant, { dx, dy, dz }); // 결정구조 평행이동 후 나간 입자 제거 및 빈 공간 다시 채움
+                            std::vector<std::array<std::complex<double>, 4>> resultFFT = convertToDensityFuncAndFFT(targetPoints, latticeConstant, DENSITY_GRID);
+                            {
+                                std::unique_lock<std::mutex> lock(fourierTransSaveMutex);  // 수정
+                                fourierTransSave.push_back({ {dx, dy, dz}, resultFFT });
+                            }
+                        });
                 }
             }
         }
 
-        std::wprintf(L"Phase spectrum 추가 완료\n", this);
+        threadPool.waitForThreads();
 
-        std::wprintf(L"새로운 Fourier reference가 성공적으로 추가되었다.\n", this);
+        std::wprintf(L"평행이동 아카이브 추가 완료\n");
+        {
+            __int64 elapsedSeconds = (getNanoTimer() - startTransTime) / 1e9;
+            int hours = elapsedSeconds / 3600;
+            int minutes = (elapsedSeconds % 3600) / 60;
+            int seconds = elapsedSeconds % 60;
+            std::wprintf(L"평행이동 아카이빙에 걸린 시간 : %02d시간 %02d분 %02d초\n", hours, minutes, seconds);
+        }
+
+        std::wprintf(L"새로운 Fourier reference가 성공적으로 추가되었다.\n");
         hasFourierRef = true;
     }
+
 
     double calcMSELossAmpFFT(const std::vector<std::array<std::complex<double>, 4>>& firstFFT, const std::vector<std::array<std::complex<double>, 4>>& secondFFT)
     {
@@ -912,7 +823,6 @@ export struct Func
         return loss / (double)firstFFT.size();
     }
 
-
     Eigen::Matrix3d getRotationByFFT()
     {
         __int64 startTimeStamp = getNanoTimer();
@@ -923,34 +833,51 @@ export struct Func
         }
 
         double minLoss = std::numeric_limits<double>::max();
-        Point minAngle = { 0,0,0 };
+        Point minAngle = { 0, 0 };
+        std::mutex mtx;
 
-        std::vector<std::array<std::complex<double>, 4>> currentFFT = convertToDensityFuncAndFFT(myPoints,latticeConstant,DENSITY_GRID);
-        for (int i = 0; i < fourierAngleSave.size(); i++)
+        std::vector<std::array<std::complex<double>, 4>> currentFFT = convertToDensityFuncAndFFT(myPoints, latticeConstant, DENSITY_GRID);
+        int numThreads = std::thread::hardware_concurrency();
+        int chunkSize = fourierAngleSave.size() / numThreads;
+        std::vector<std::thread> threads;
+
+        for (int t = 0; t < numThreads; ++t)
         {
-            std::vector<std::array<std::complex<double>, 4>> refFFT = fourierAngleSave[i].second;
-            double loss = calcMSELossAmpFFT(currentFFT, refFFT); // MSE 손실함수
-            if (loss < minLoss) // 가장 낮은 손실함수를 가진 회전행렬을 찾음
-            {
-                minLoss = loss;
-                minAngle = { fourierAngleSave[i].first.x,fourierAngleSave[i].first.y,fourierAngleSave[i].first.z };
-            }
+            int start = t * chunkSize;
+            int end = (t == numThreads - 1) ? fourierAngleSave.size() : start + chunkSize;
+            threads.emplace_back([&currentFFT, &minLoss, &minAngle, &mtx, start, end,this]() {
+                for (int i = start; i < end; ++i)
+                {
+                    std::vector<std::array<std::complex<double>, 4>> refFFT = fourierAngleSave[i].second;
+                    double loss = calcMSELossAmpFFT(currentFFT, refFFT);
+                    std::lock_guard<std::mutex> lock(mtx);
+                    if (loss < minLoss)
+                    {
+                        minLoss = loss;
+                        minAngle = fourierAngleSave[i].first;
+                    }
+                }
+                });
+        }
+
+        for (auto& th : threads)
+        {
+            th.join();
         }
 
         std::wprintf(L"======================================================================================\n");
-        std::wprintf(L"스펙트럼 분석이 완료되었다.\n");
+        std::wprintf(L"진폭 스펙트럼 분석이 완료되었다.\n");
         __int64 elapsedSeconds = (getNanoTimer() - startTimeStamp) / 1e9;
         int hours = elapsedSeconds / 3600;
         int minutes = (elapsedSeconds % 3600) / 60;
         int seconds = elapsedSeconds % 60;
         std::wprintf(L"걸린 시간 : %02d시간 %02d분 %02d초\n", hours, minutes, seconds);
         std::wprintf(L"최소 손실(loss = %f)을 가지는 회전행렬은 다음과 같다.\n", minLoss);
-        
-        double xRad = minAngle.x * degreeToRadian; //x축 회전
-        double yRad = minAngle.y * degreeToRadian; //y축 회전
-        double zRad = minAngle.z * degreeToRadian; //z축 회전
+        double xRad = minAngle.x * DEGREE_TO_RADIAN; //x축 회전
+        double yRad = minAngle.y * DEGREE_TO_RADIAN; //y축 회전
+        double zRad = minAngle.z * DEGREE_TO_RADIAN; //z축 회전
 
-        Eigen::Matrix3d rotX, rotY, rotZ;
+        Eigen::Matrix3d rotX, rotY, rotZ, minRot;
         rotX << 1, 0, 0,
             0, cos(xRad), -sin(xRad),
             0, sin(xRad), cos(xRad);
@@ -963,9 +890,10 @@ export struct Func
             sin(zRad), cos(zRad), 0,
             0, 0, 1;
 
-        Eigen::Matrix3d minMat = rotZ * rotY * rotX;
-        std::cout << minMat << std::endl;
-        printRotationMatrix(minMat);
+        minRot = rotZ * rotY * rotX;
+        
+        printRotationMatrix(minRot);
+        return minRot;
     }
 
     Eigen::Vector3d getTranslationByFFT()
@@ -981,27 +909,45 @@ export struct Func
         double minLoss = std::numeric_limits<double>::max();
         Eigen::Vector3d minVec;
         minVec << 0, 0, 0;
+        std::mutex mtx;
 
-        std::vector<std::array<std::complex<double>, 4>> currentFFT = convertToDensityFuncAndFFT(myPoints,latticeConstant,DENSITY_GRID);
-        for (int i = 0; i < fourierTransSave.size(); i++)
+        std::vector<std::array<std::complex<double>, 4>> currentFFT = convertToDensityFuncAndFFT(myPoints, latticeConstant, DENSITY_GRID);
+        int numThreads = std::thread::hardware_concurrency();
+        int chunkSize = fourierTransSave.size() / numThreads;
+        std::vector<std::thread> threads;
+
+        for (int t = 0; t < numThreads; ++t)
         {
-            std::vector<std::array<std::complex<double>, 4>> refFFT = fourierTransSave[i].second;
-            double loss = calcMSELossAmpFFT(currentFFT, refFFT); // MSE 손실함수
-            if (loss < minLoss) // 가장 낮은 손실함수를 가진 회전행렬을 찾음
-            {
-                minLoss = loss;
-                minVec = { fourierTransSave[i].first.x,fourierTransSave[i].first.y,fourierTransSave[i].first.z };
-            }
+            int start = t * chunkSize;
+            int end = (t == numThreads - 1) ? fourierTransSave.size() : start + chunkSize;
+            threads.emplace_back([&currentFFT, &minLoss, &minVec, &mtx, start, end,this]() {
+                for (int i = start; i < end; ++i)
+                {
+                    std::vector<std::array<std::complex<double>, 4>> refFFT = fourierTransSave[i].second;
+                    double loss = calcMSELossAmpFFT(currentFFT, refFFT);
+                    std::lock_guard<std::mutex> lock(mtx);
+                    if (loss < minLoss)
+                    {
+                        minLoss = loss;
+                        minVec = { fourierTransSave[i].first.x, fourierTransSave[i].first.y, fourierTransSave[i].first.z };
+                    }
+                }
+                });
+        }
+
+        for (auto& th : threads)
+        {
+            th.join();
         }
 
         std::wprintf(L"======================================================================================\n");
-        std::wprintf(L"스펙트럼 분석이 완료되었다.\n");
+        std::wprintf(L"위상 스펙트럼 분석이 완료되었다.\n");
         __int64 elapsedSeconds = (getNanoTimer() - startTimeStamp) / 1e9;
         int hours = elapsedSeconds / 3600;
         int minutes = (elapsedSeconds % 3600) / 60;
         int seconds = elapsedSeconds % 60;
         std::wprintf(L"걸린 시간 : %02d시간 %02d분 %02d초\n", hours, minutes, seconds);
-        std::wprintf(L"최소 손실(loss = %f)을 가지는 평행이동 벡터는 다음과 같다.\n",minLoss);
+        std::wprintf(L"최소 손실(loss = %f)을 가지는 평행이동 벡터는 다음과 같다.\n", minLoss);
         std::cout << minVec << std::endl;
         return minVec;
     }
@@ -1024,6 +970,25 @@ export struct Func
         }
         return hammingWindow;
     }
+
+    void invariablize()
+    {
+        if (hasFourierRef == false)
+        {
+            std::wprintf(L"[Error] 참조할 푸리에 변환 값이 존재하지 않는다.\n");
+            return;
+        }
+
+        if (latticeConstant == 0)
+        {
+            std::wprintf(L"[Error] 격자 상수가 정의되어 있지 않다.\n");
+            return;
+        }
+
+        latticeRotation(myPoints, latticeConstant, getRotationByFFT().inverse());
+        latticeTranslation(myPoints, latticeConstant, -getTranslationByFFT());
+    }
+
 };
 
 

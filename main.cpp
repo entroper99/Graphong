@@ -6,10 +6,10 @@
 #include <Eigen/Dense>
 #include <codecvt>
 #include <windows.h>
-
 #include <fstream>
 #include <string>
 #include <iostream>
+#include <fftw3.h>
 
 import std;
 import globalVar;
@@ -22,9 +22,7 @@ import inputCol;
 import Func;
 import utilMath;
 import utilFile;
-
-
-
+import randomRange;
 
 void prtFuncName()
 {
@@ -55,6 +53,8 @@ int main(int argc, char** argv)
     glEnable(GL_BLEND);
     glBlendFunc(GL_SRC_ALPHA, GL_ONE_MINUS_SRC_ALPHA);
 
+    fftw_init_threads();
+    fftw_make_planner_thread_safe();
 
     std::wprintf(L"\033[0;37m");
     std::wprintf(L"**********************************************************\n");
@@ -142,8 +142,8 @@ int main(int argc, char** argv)
             if (camFixMinusZ || camFixZ || camFixMinusX || camFixX || camFixMinusY || camFixY) std::wprintf(L"7.Axis 카메라 고정 해제\n");
             else std::wprintf(L"7.2차원 카메라 고정\n");
             std::wprintf(L"\033[0;33m8.Delaunay 삼각분할\033[0m\n");
-            std::wprintf(L"9. 함수 Translation (평행이동)\n");
-            std::wprintf(L"10. 함수 Rotation (회전)\n");
+            std::wprintf(L"9. 함수 평행이동\n");
+            std::wprintf(L"10. 함수 회전\n");
             std::wprintf(L"\033[0;33m11.[2차원] Cubic 스플라인 보간 실행\033[0m\n");
             std::wprintf(L"\033[0;33m12.[2차원] 기존 보간값에 대해 선형 보간 실행\033[0m\n");
             if (visDataPoint)  std::wprintf(L"14.데이터점 화면 표시 [ \033[0;32mON\033[0m / OFF ]\n");
@@ -157,25 +157,17 @@ int main(int argc, char** argv)
             std::wprintf(L"22.함수 목록 출력\n");
             std::wprintf(L"23.자이로이드 구조 생성\n");
             std::wprintf(L"24.함수값 출력\n");
-            std::wprintf(L"25.중심점에 대해 함수 표준화\n");
             std::wprintf(L"26.PDE Solver\n");
             std::wprintf(L"27.LAMMPS Trajectory 파일 읽기\n");
             std::wprintf(L"\033[0;33m29.Sort by COM \033[0m\n");
             std::wprintf(L"\033[0;33m30.Define Lattice Constant \033[0m\n");
-            std::wprintf(L"\033[0;33m31.결정구조 Rotaiton \033[0m\n");
-            std::wprintf(L"\033[0;33m32.결정구조 Translation \033[0m\n");
+            std::wprintf(L"\033[0;33m31.결정구조 회전 (행렬입력) \033[0m\n");
+            std::wprintf(L"\033[0;33m32.결정구조 평행이동 \033[0m\n");
             std::wprintf(L"\033[0;33m33.Sort by PCA \033[0m\n");
+            std::wprintf(L"\033[0;33m34.결정구조 회전 (각도입력) \033[0m\n");
             std::wprintf(L"\033[0;33m36.푸리에변환 레퍼런스 입력\033[0m\n");
             std::wprintf(L"\033[0;33m37.푸리에변환 Amplitude Spectrum 회전행렬 구하기\033[0m\n");
             std::wprintf(L"\033[0;33m38.푸리에변환 Phase Spectrum 평행이동벡터 구하기\033[0m\n");
-            //std::wprintf(L"\033[37m");
-            //std::wprintf(L"101.[Plumed] COLVAR : draw time-# Graph \n");
-            //std::wprintf(L"102.[Plumed] COLVAR : draw time-biasPot Graph \n");
-            //std::wprintf(L"103.[Plumed] FES : draw FES result \n");
-            //std::wprintf(L"104.[Plumed] FES : draw FES by time \n");
-            //std::wprintf(L"105.[Plumed] Sigma - Probability Density \n");
-            //std::wprintf(L"106.[Plumed] Sigma - Overlap \n");
-            //std::wprintf(L"\033[0m");
             std::wprintf(L"------------------▼아래에 값 입력-----------------\n");
 
             int input = 0;
@@ -185,7 +177,7 @@ int main(int argc, char** argv)
                 std::wstring file = L"";
                 std::wprintf(L"데이터가 있는 파일을 선택해주세요.\n");
                 file = openFileDialog();
-                std::wprintf(L"파일 %ls 를 대상으로 설정하였다.\n",file.c_str());
+                std::wprintf(L"파일 %ls 를 대상으로 설정하였다.\n", file.c_str());
                 std::wifstream in(file);
                 if (in.is_open())
                 {
@@ -468,7 +460,7 @@ int main(int argc, char** argv)
                 std::wprintf(L"Vector : { %f, %f, %f }\n", compX, compY, compZ);
 
 
-                ((Func*)funcSet[dataIndex])->translation(compX,compY,compZ);
+                ((Func*)funcSet[dataIndex])->translation(compX, compY, compZ);
                 ((Func*)funcSet[dataIndex])->scalarCalc();
                 std::wprintf(L"이 함수의 평균 f값은 %f이다.\n", ((Func*)funcSet[dataIndex])->scalarSquareAvg());
             }
@@ -700,14 +692,6 @@ int main(int argc, char** argv)
                     std::wprintf(L"%.10f,%.10f,%.10f\n", i, pt.x, pt.y, pt.z);
                 }
             }
-            else if (input == 25) //데이터 표준화
-            {
-                int dataIndex = 0;
-                std::wprintf(L"몇번째 데이터를 표준화시킬까? (0 ~ %d).\n", funcSet.size() - 1);
-                prtFuncName();
-                std::cin >> dataIndex;
-                ((Func*)funcSet[dataIndex])->invariablize(BOX_SIZE);
-            }
             else if (input == 26)
             {
                 std::wprintf(L"Fick's 2nd Law : ∂C/∂t = (∂/∂x)(D(C)∂C/∂x)\n");
@@ -845,7 +829,7 @@ int main(int argc, char** argv)
                         double diff_halfBefore = diffFunc((conc[t][i] + conc[t][i + 1]) / 2.0);
                         double diff_halfAfter = diffFunc((conc[t][i] + conc[t][i - 1]) / 2.0);
                         concNew[i] = conc[t][i] + delT / (delX * delX) * (diff_halfBefore * (conc[t][i + 1] - conc[t][i]) - diff_halfAfter * (conc[t][i] - conc[t][i - 1]));
-                        
+
                         counter++;
                         if (doPrint && counter >= printInterval)
                         {
@@ -858,7 +842,7 @@ int main(int argc, char** argv)
                     conc.push_back(concNew);
                 }
 
-               
+
                 Func* targetFunc = new Func(funcFlag::dim3);
 
                 targetFunc->myColor = inputCol();
@@ -875,7 +859,7 @@ int main(int argc, char** argv)
                         pt.y = conc[t][x];
                         targetFunc->myPoints.push_back(pt);
 
-                        
+
                     }
                 }
 
@@ -912,7 +896,7 @@ int main(int argc, char** argv)
                 std::wifstream in(file);
                 if (in.is_open())
                 {
-                    readTrjFile(file, 9, -1, 2, 3, 4,1,2);
+                    readTrjFile(file, 9, -1, 2, 3, 4, 1, 2);
                     Func* tgtFunc = ((Func*)funcSet[funcSet.size() - 1]);
                     tgtFunc->period = BOX_SIZE / 2.0;
 
@@ -921,17 +905,16 @@ int main(int argc, char** argv)
                     //따라서 한변의 지름은 10.7379 - (-0.111315) = 10.849215
                     double length = BOX_SIZE / 2.0;
                     double scaleFactor = 2.0 * M_PI / length;
-
                     tgtFunc->scalarFunc = [=](double x, double y, double z)->double
                         {
-                            return (std::cos(scaleFactor *x) * std::sin(scaleFactor * y) * std::sin(2 * (scaleFactor *z)) + std::cos(scaleFactor *y) * std::sin(scaleFactor *z) * std::sin(2 * (scaleFactor *x)) + std::cos(scaleFactor *z) * std::sin(scaleFactor *x) * std::sin(2 * (scaleFactor *y)));
+                            return (std::cos(scaleFactor * x) * std::sin(scaleFactor * y) * std::sin(2 * (scaleFactor * z)) + std::cos(scaleFactor * y) * std::sin(scaleFactor * z) * std::sin(2 * (scaleFactor * x)) + std::cos(scaleFactor * z) * std::sin(scaleFactor * x) * std::sin(2 * (scaleFactor * y)));
                         };
 
                     tgtFunc->scalarInfimum = -1.0;
                     tgtFunc->scalarSupremum = 1.0;
                     tgtFunc->scalarCalc();
                     tgtFunc->latticeConstant = BOX_SIZE;// / 2.0;
-                    tgtFunc->translation(-BOX_SIZE /2.0, -BOX_SIZE / 2.0, -BOX_SIZE / 2.0);
+                    tgtFunc->translation(-BOX_SIZE / 2.0, -BOX_SIZE / 2.0, -BOX_SIZE / 2.0);
                     std::wprintf(L"이 함수의 평균 f값은 %f이다.\n", tgtFunc->scalarSquareAvg());
                 }
                 else std::wprintf(L"파일을 읽는데 실패하였습니다.\n");
@@ -956,7 +939,7 @@ int main(int argc, char** argv)
                     prtFuncName();
                     std::cin >> dataIndex;
                 }
-                std::wprintf(L"격자상수의 값을 몇으로 할까? (기본 10.849215)\n");
+                std::wprintf(L"격자상수의 값을 몇으로 할까? (ㄴ기본 10.849215)\n");
                 std::cin >> ((Func*)funcSet[dataIndex])->latticeConstant;
                 std::wprintf(L"격자상수 정의를 완료하였다. 현재 %d개의 입자가 결정구조 내에 존재한다.\n", ((Func*)funcSet[dataIndex])->countPointsWithinLattice());
             }
@@ -1038,7 +1021,9 @@ int main(int argc, char** argv)
                 printRotationMatrix(inputMatrix);
 
                 Func* tgtFunc = ((Func*)funcSet[dataIndex]);
-                tgtFunc->latticeRotation(tgtFunc->myPoints, tgtFunc->latticeConstant,inputMatrix);
+                tgtFunc->latticeRotation(tgtFunc->myPoints, tgtFunc->latticeConstant, inputMatrix);
+                tgtFunc->scalarCalc();
+                std::wprintf(L"회전 후의 f값은 %f이다.\n", tgtFunc->scalarSquareAvg());
             }
             else if (input == 32)
             {
@@ -1065,7 +1050,9 @@ int main(int argc, char** argv)
                 std::wprintf(L"Vector : { %f, %f, %f }\n", compX, compY, compZ);
 
                 Func* tgtFunc = ((Func*)funcSet[dataIndex]);
-                tgtFunc->latticeTranslation(tgtFunc->myPoints, tgtFunc->latticeConstant,{ compX, compY, compZ });
+                tgtFunc->latticeTranslation(tgtFunc->myPoints, tgtFunc->latticeConstant, { compX, compY, compZ });
+                tgtFunc->scalarCalc();
+                std::wprintf(L"평행이동 후의 f값은 %f이다.\n", tgtFunc->scalarSquareAvg());
             }
             else if (input == 33)
             {
@@ -1077,6 +1064,40 @@ int main(int argc, char** argv)
                     std::cin >> dataIndex;
                 }
                 ((Func*)funcSet[dataIndex])->sortByPCA();
+            }
+            else if (input == 34)//각도입력 회전
+            {
+                int dataIndex = 0;
+                if (funcSet.size() > 1)
+                {
+                    std::wprintf(L"몇번째 데이터의 결정구조를 회전시킬까?? (0 ~ %d).\n", funcSet.size() - 1);
+                    prtFuncName();
+                    std::cin >> dataIndex;
+                }
+
+                double xAngle = 0;
+                double yAngle = 0;
+                double zAngle = 0;
+                std::wprintf(L"Rotation Matrix의 x축 회전 값(도 단위)을 입력해주세요.\n");
+                std::wprintf(L"{ ■, □ ,□ }\n");
+                std::cin >> xAngle;
+
+                std::wprintf(L"Rotation Matrix의 y축 회전 값(도 단위)을 입력해주세요.\n");
+                std::wprintf(L"{ %f, ■, □ }\n", xAngle);
+                std::cin >> yAngle;
+
+                std::wprintf(L"Rotation Matrix의 z축 회전 값(도 단위)을 입력해주세요.\n");
+                std::wprintf(L"{ %f, %f, ■ }\n", xAngle, yAngle);
+                std::cin >> zAngle;
+
+                std::wprintf(L"입력이 완료되었다.\n");
+                std::wprintf(L"다음 행렬로 rotation을 진행합니다.\n");
+                printRotationMatrix(angleToMatrix(xAngle, yAngle, zAngle));
+
+                Func* tgtFunc = ((Func*)funcSet[dataIndex]);
+                tgtFunc->latticeRotation(tgtFunc->myPoints, tgtFunc->latticeConstant, angleToMatrix(xAngle, yAngle, zAngle));
+                tgtFunc->scalarCalc();
+                std::wprintf(L"회전 후의 f값은 %f이다.\n", tgtFunc->scalarSquareAvg());
             }
             else if (input == 36)
             {
@@ -1110,6 +1131,100 @@ int main(int argc, char** argv)
                     std::cin >> dataIndex;
                 }
                 ((Func*)funcSet[dataIndex])->getTranslationByFFT();
+            }
+            else if (input == 39)
+            {
+                for (int atomType = 2; atomType <= 2; atomType++)//원자2만 진행하도록
+                {
+                    std::wstring file = L"";
+                    std::wprintf(L"데이터가 있는 파일을 선택해주세요.\n");
+                    file = openFileDialog();
+                    std::wprintf(L"파일 %ls 를 대상으로 설정하였다.\n", file.c_str());
+                    std::ifstream in(file);
+                    if (in.is_open())
+                    {
+                        std::string str;
+                        in.seekg(0, std::ios::end);
+                        size_t size = in.tellg();
+                        str.resize(size);
+                        in.seekg(0, std::ios::beg);
+                        in.read(&str[0], size);
+                        in.close();
+
+                        Func* timeGraphFunc = new Func(funcFlag::scalarField);
+                        timeGraphFunc->funcType = funcFlag::dim2;
+                        timeGraphFunc->funcName = L"TIME-STEP F_AVG";
+                        std::wprintf(L"보정된 F_avg의 색을 뭘로 할까?\n");
+                        timeGraphFunc->myColor = inputCol();
+
+                        Func* originGraphFunc = new Func(funcFlag::scalarField);
+                        originGraphFunc->funcType = funcFlag::dim2;
+                        originGraphFunc->funcName = L"ORIGIN-STEP F_AVG";
+                        std::wprintf(L"원본 F_avg의 색을 뭘로 할까?\n");
+                        originGraphFunc->myColor = inputCol();
+
+                        int i = 0;
+                        while (1)
+                        {
+                            readTrjString(str, 9, -1, 2, 3, 4, 1, atomType);
+                            Func* tgtGyroid = ((Func*)funcSet[funcSet.size() - 1]);
+                            double length = BOX_SIZE / 2.0;
+                            double scaleFactor = 2.0 * M_PI / length;
+                            tgtGyroid->scalarFunc = [=](double x, double y, double z)->double
+                                {
+                                    return (std::cos(scaleFactor * x) * std::sin(scaleFactor * y) * std::sin(2 * (scaleFactor * z)) + std::cos(scaleFactor * y) * std::sin(scaleFactor * z) * std::sin(2 * (scaleFactor * x)) + std::cos(scaleFactor * z) * std::sin(scaleFactor * x) * std::sin(2 * (scaleFactor * y)));
+                                };
+                            tgtGyroid->translation(-BOX_SIZE / 2.0, -BOX_SIZE / 2.0, -BOX_SIZE / 2.0);
+                            tgtGyroid->latticeConstant = BOX_SIZE;// / 2.0;
+                            tgtGyroid->scalarCalc();
+                            originGraphFunc->myPoints.push_back({ (double)i,tgtGyroid->scalarSquareAvg(),0 });
+                            double originF = tgtGyroid->scalarSquareAvg();
+                            
+                            double lat = tgtGyroid->latticeConstant;
+                            Eigen::Vector3d inputVec = { randomRangeFloat(-lat / 2.0,lat / 2.0),randomRangeFloat(-lat / 2.0,lat / 2.0),randomRangeFloat(-lat / 2.0,lat / 2.0) };
+                            tgtGyroid->translation(tgtGyroid->myPoints, inputVec);
+
+                            double xAngle = randomRangeFloat(0, 360.0);
+                            double yAngle = randomRangeFloat(0, 360.0);
+                            double zAngle = randomRangeFloat(0, 360.0);
+
+                            double xRad = xAngle * DEGREE_TO_RADIAN;
+                            double yRad = yAngle * DEGREE_TO_RADIAN;
+                            double zRad = zAngle * DEGREE_TO_RADIAN;
+
+                            Eigen::Matrix3d rotX, rotY, rotZ;
+                            rotX << 1, 0, 0,
+                                0, cos(xRad), -sin(xRad),
+                                0, sin(xRad), cos(xRad);
+
+                            rotY << cos(yRad), 0, sin(yRad),
+                                0, 1, 0,
+                                -sin(yRad), 0, cos(yRad);
+
+                            rotZ << cos(zRad), -sin(zRad), 0,
+                                sin(zRad), cos(zRad), 0,
+                                0, 0, 1;
+                            Eigen::Matrix3d inputRot = rotZ * rotY * rotX;
+                            tgtGyroid->rotation(tgtGyroid->myPoints, inputRot);
+
+                            std::wprintf(L"TIME %d : 랜덤 평행이동 : (%f,%f,%f), 랜덤 회전 : (%f,%f,%f)\n", i, inputVec[0], inputVec[1], inputVec[2], xAngle, yAngle, zAngle);
+                            tgtGyroid->invariablize();
+                            tgtGyroid->scalarCalc();
+
+                            timeGraphFunc->myPoints.push_back({ (double)i,tgtGyroid->scalarSquareAvg(),0 });
+                            std::wprintf(L"TIME %d : 원본 f값은 %f이고 변형 f값은 %f이다.\n", i, originF,tgtGyroid->scalarSquareAvg());
+                            delete tgtGyroid;
+
+                            size_t firstTimestepPos = str.find("ITEM: TIMESTEP");
+                            size_t secondTimestepPos = str.find("ITEM: TIMESTEP", firstTimestepPos + 1);
+                            if (secondTimestepPos == std::string::npos) break;
+                            else str = str.substr(secondTimestepPos);
+                            i++;
+                        }
+                    }
+                    else std::wprintf(L"파일을 읽는데 실패하였습니다.\n");
+
+                }
             }
             else std::wprintf(L"잘못된 값이 입력되었다.\n");
         }
@@ -1299,16 +1414,16 @@ int main(int argc, char** argv)
                         double val = tgtFunc->scalar[tgtFunc->myPoints[i]];
                         if (val < tgtFunc->scalarInfimum)
                         {
-                           col = rainbow(0);
+                            col = rainbow(0);
                         }
                         else if (val > tgtFunc->scalarSupremum)
                         {
-                           col = rainbow(0.7);
+                            col = rainbow(0.7);
                         }
                         else
                         {
-                           //std::wprintf(L"컬러의 값은 %f이다.\n", 0.7 * ((val - tgtFunc->scalarInfimum) / (tgtFunc->scalarSupremum - tgtFunc->scalarInfimum)));
-                           col = rainbow(0.7* ((val - tgtFunc->scalarInfimum) / (tgtFunc->scalarSupremum - tgtFunc->scalarInfimum)));
+                            //std::wprintf(L"컬러의 값은 %f이다.\n", 0.7 * ((val - tgtFunc->scalarInfimum) / (tgtFunc->scalarSupremum - tgtFunc->scalarInfimum)));
+                            col = rainbow(0.7 * ((val - tgtFunc->scalarInfimum) / (tgtFunc->scalarSupremum - tgtFunc->scalarInfimum)));
                         }
                         glColor3f(((float)col.r) / 256.0, ((float)col.g) / 256.0, ((float)col.b) / 256.0);
                     }
@@ -1367,7 +1482,7 @@ int main(int argc, char** argv)
         {
             Func* tgtFunc = (Func*)funcSet[dataIndex];
             if (tgtFunc->latticeConstant != 0)
-               {
+            {
                 // 라인 그리기
                 glBegin(GL_LINES);
                 glColor3f(0.0 / 256.0, 255.0 / 256.0, 255.0 / 256.0);
@@ -1446,20 +1561,20 @@ int main(int argc, char** argv)
             {
                 glBegin(GL_LINES);
                 glColor3f(((float)tgtFunc->myColor.r) / 256.0, ((float)tgtFunc->myColor.g) / 256.0, ((float)tgtFunc->myColor.b) / 256.0);
-                glVertex3f(tgtFunc->triangles[i].p1.x * zeroX* xScale, tgtFunc->triangles[i].p1.y * zeroY* yScale, tgtFunc->triangles[i].p1.z * zeroZ* zScale);
-                glVertex3f(tgtFunc->triangles[i].p2.x * zeroX* xScale, tgtFunc->triangles[i].p2.y * zeroY* yScale, tgtFunc->triangles[i].p2.z * zeroZ* zScale);
+                glVertex3f(tgtFunc->triangles[i].p1.x * zeroX * xScale, tgtFunc->triangles[i].p1.y * zeroY * yScale, tgtFunc->triangles[i].p1.z * zeroZ * zScale);
+                glVertex3f(tgtFunc->triangles[i].p2.x * zeroX * xScale, tgtFunc->triangles[i].p2.y * zeroY * yScale, tgtFunc->triangles[i].p2.z * zeroZ * zScale);
                 glEnd();
 
                 glBegin(GL_LINES);
                 glColor3f(((float)tgtFunc->myColor.r) / 256.0, ((float)tgtFunc->myColor.g) / 256.0, ((float)tgtFunc->myColor.b) / 256.0);
-                glVertex3f(tgtFunc->triangles[i].p1.x * zeroX* xScale, tgtFunc->triangles[i].p1.y * zeroY* yScale, tgtFunc->triangles[i].p1.z * zeroZ* zScale);
-                glVertex3f(tgtFunc->triangles[i].p3.x * zeroX* xScale, tgtFunc->triangles[i].p3.y * zeroY* yScale, tgtFunc->triangles[i].p3.z * zeroZ* zScale);
+                glVertex3f(tgtFunc->triangles[i].p1.x * zeroX * xScale, tgtFunc->triangles[i].p1.y * zeroY * yScale, tgtFunc->triangles[i].p1.z * zeroZ * zScale);
+                glVertex3f(tgtFunc->triangles[i].p3.x * zeroX * xScale, tgtFunc->triangles[i].p3.y * zeroY * yScale, tgtFunc->triangles[i].p3.z * zeroZ * zScale);
                 glEnd();
 
                 glBegin(GL_LINES);
                 glColor3f(((float)tgtFunc->myColor.r) / 256.0, ((float)tgtFunc->myColor.g) / 256.0, ((float)tgtFunc->myColor.b) / 256.0);
-                glVertex3f(tgtFunc->triangles[i].p2.x * zeroX* xScale, tgtFunc->triangles[i].p2.y * zeroY* yScale, tgtFunc->triangles[i].p2.z * zeroZ* zScale);
-                glVertex3f(tgtFunc->triangles[i].p3.x * zeroX* xScale, tgtFunc->triangles[i].p3.y * zeroY* yScale, tgtFunc->triangles[i].p3.z * zeroZ* zScale);
+                glVertex3f(tgtFunc->triangles[i].p2.x * zeroX * xScale, tgtFunc->triangles[i].p2.y * zeroY * yScale, tgtFunc->triangles[i].p2.z * zeroZ * zScale);
+                glVertex3f(tgtFunc->triangles[i].p3.x * zeroX * xScale, tgtFunc->triangles[i].p3.y * zeroY * yScale, tgtFunc->triangles[i].p3.z * zeroZ * zScale);
                 glEnd();
 
 
@@ -1558,11 +1673,7 @@ int main(int argc, char** argv)
             glMatrixMode(GL_MODELVIEW);
         }
 
-
-
         SDL_GL_SwapWindow(window);
-
-
     }
 
     TTF_Quit();

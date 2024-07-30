@@ -119,6 +119,3 @@ export struct Vector
 };
 
 
-export struct Tensor
-{
-};

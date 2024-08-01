@@ -16,6 +16,7 @@ import utilMath;
 import nanoTimer;
 import ThreadPool;
 
+        std::mutex density_mutex;
 
 export struct Func
 {
@@ -634,8 +635,12 @@ export struct Func
             }
         }
 
-        Eigen::Tensor<double, 3> windowFunc = createHammingWindow(inputGridSize);
+        std::wprintf(L"밀도 함수 구성을 완료하였다.\n");
+
+        Eigen::Tensor<double, 3> windowFunc = createBlackmanWindow(inputGridSize);
         density = density * windowFunc;
+        std::wprintf(L"창함수를 곱하였다.\n");
+
 
         fftw_complex* input, * output;
         fftw_plan p;
@@ -663,8 +668,14 @@ export struct Func
             }
         }
 
+        std::wprintf(L"푸리에변환 입력값 구성이 끝났다.\n");
+
+
         p = fftw_plan_dft_3d(inputGridSize, inputGridSize, inputGridSize, input, output, FFTW_FORWARD, FFTW_ESTIMATE);
         fftw_execute(p);
+
+        std::wprintf(L"푸리에변환 계산이 끝났다.\n");
+
 
         double delta_x = del;
         double delta_y = del;
@@ -693,6 +704,153 @@ export struct Func
             }
         }
 
+        wprintf(L"푸리에변환한 결과값을 저장했다.\n");
+
+
+        fftw_destroy_plan(p);
+        fftw_free(input);
+        fftw_free(output);
+        return fourierResult;
+    }
+
+
+    Eigen::Tensor<std::complex<double>, 3> convertToDensityFuncAndFFT2(const std::vector<Point>& inputPoints, double inputLatticeConstant, int inputGridSize)
+    {
+        double gaussAmp = 1.0;
+        double gaussSig = 1.0;
+        std::vector<std::array<double, 4>> densityFunc;
+        double del = inputLatticeConstant / (inputGridSize - 1);
+        int gridSize = inputGridSize * inputGridSize * inputGridSize;
+
+        Eigen::Tensor<double, 3> density(inputGridSize, inputGridSize, inputGridSize);
+        density.setZero();
+
+
+        std::mutex density_mutex;
+        int totalSize = inputGridSize * inputGridSize * inputGridSize;
+        int numThreads = std::thread::hardware_concurrency();
+        int blockSize = totalSize / numThreads;
+
+        auto calculateDensityPart = [&density, &inputPoints, inputLatticeConstant, del, gaussSig, gaussAmp, inputGridSize,&density_mutex](int startIdx, int endIdx)
+            {
+                for (int i = startIdx; i < endIdx; ++i)
+                {
+                    int xIdx = i / (inputGridSize * inputGridSize);
+                    int yIdx = (i / inputGridSize) % inputGridSize;
+                    int zIdx = i % inputGridSize;
+
+                    double tgtX = xIdx * del - inputLatticeConstant / 2.0;
+                    double tgtY = yIdx * del - inputLatticeConstant / 2.0;
+                    double tgtZ = zIdx * del - inputLatticeConstant / 2.0;
+
+                    double densityValue = 0;
+                    for (const auto& point : inputPoints)
+                    {
+                        densityValue += calcGaussian(point.x - tgtX, point.y - tgtY, point.z - tgtZ, gaussSig, gaussAmp);
+                    }
+
+                    density(xIdx, yIdx, zIdx) = densityValue;
+                }
+            };
+
+        std::vector<std::thread> threads;
+        for (int i = 0; i < numThreads; ++i)
+        {
+            int startIdx = i * blockSize;
+            int endIdx = (i == numThreads - 1) ? totalSize : startIdx + blockSize;
+            threads.emplace_back(calculateDensityPart, startIdx, endIdx);
+        }
+
+        for (auto& thread : threads)  thread.join();
+
+
+        //for (double tgtX = -inputLatticeConstant / 2.0; tgtX <= inputLatticeConstant / 2.0; tgtX += del)
+        //{
+        //    for (double tgtY = -inputLatticeConstant / 2.0; tgtY <= inputLatticeConstant / 2.0; tgtY += del)
+        //    {
+        //        for (double tgtZ = -inputLatticeConstant / 2.0; tgtZ <= inputLatticeConstant / 2.0; tgtZ += del)
+        //        {
+        //            double densityValue = 0;
+        //            for (const auto& point : inputPoints)
+        //            {
+        //                densityValue += calcGaussian(point.x - tgtX, point.y - tgtY, point.z - tgtZ, gaussSig, gaussAmp);
+        //            }
+        //            int xIdx = std::round((tgtX + inputLatticeConstant / 2.0) / del);
+        //            int yIdx = std::round((tgtY + inputLatticeConstant / 2.0) / del);
+        //            int zIdx = std::round((tgtZ + inputLatticeConstant / 2.0) / del);
+        //            density(xIdx, yIdx, zIdx) = densityValue;
+        //        }
+        //    }
+        //}
+
+        std::wprintf(L"밀도 함수 구성을 완료하였다.\n");
+
+        Eigen::Tensor<double, 3> windowFunc = createHammingWindow(inputGridSize);
+        density = density * windowFunc;
+        std::wprintf(L"창함수를 곱하였다.\n");
+
+
+        fftw_complex* input, * output;
+        fftw_plan p;
+        input = (fftw_complex*)fftw_malloc(sizeof(fftw_complex) * gridSize);
+        output = (fftw_complex*)fftw_malloc(sizeof(fftw_complex) * gridSize);
+        if (!input || !output)
+        {
+            std::wprintf(L"[FFT] 메모리 할당 실패\n");
+            if (input) fftw_free(input);
+            if (output) fftw_free(output);
+            return {};
+        }
+
+        int idx = 0;
+        for (int x = 0; x < inputGridSize; ++x)
+        {
+            for (int y = 0; y < inputGridSize; ++y)
+            {
+                for (int z = 0; z < inputGridSize; ++z)
+                {
+                    input[idx][0] = density(x, y, z);//실수
+                    input[idx][1] = 0.0;//허수
+                    ++idx;
+                }
+            }
+        }
+
+        std::wprintf(L"푸리에변환 입력값 구성이 끝났다.\n");
+
+
+        p = fftw_plan_dft_3d(inputGridSize, inputGridSize, inputGridSize, input, output, FFTW_FORWARD, FFTW_ESTIMATE);
+        fftw_execute(p);
+
+        std::wprintf(L"푸리에변환 계산이 끝났다.\n");
+
+
+        double delta_x = del;
+        double delta_y = del;
+        double delta_z = del;
+
+        Eigen::Tensor<std::complex<double>, 3> fourierResult(inputGridSize, inputGridSize, inputGridSize);
+        for (int x = 0; x < inputGridSize; ++x)
+        {
+            for (int y = 0; y < inputGridSize; ++y)
+            {
+                for (int z = 0; z < inputGridSize; ++z)
+                {
+                    int i = z * inputGridSize * inputGridSize + y * inputGridSize + x;
+                    int kx = (x <= inputGridSize / 2) ? x : x - inputGridSize;
+                    int ky = (y <= inputGridSize / 2) ? y : y - inputGridSize;
+                    int kz = (z <= inputGridSize / 2) ? z : z - inputGridSize;
+
+                    std::complex<double> complexVal(output[i][0], output[i][1]);
+                    int convertX = kx + inputGridSize / 2 - 1;
+                    int convertY = ky + inputGridSize / 2 - 1;
+                    int convertZ = kz + inputGridSize / 2 - 1;
+                    fourierResult(convertX, convertY, convertZ) = complexVal;
+                }
+            }
+        }
+
+        wprintf(L"푸리에변환한 결과값을 저장했다.\n");
         fftw_destroy_plan(p);
         fftw_free(input);
         fftw_free(output);
@@ -708,7 +866,6 @@ export struct Func
         }
 
         __int64 startRotateTime = getNanoTimer();
-
 
         const int delDegree = 15;
         ThreadPool threadPool(std::thread::hardware_concurrency());
@@ -773,6 +930,8 @@ export struct Func
 
         threadPool.waitForThreads();
 
+
+
         std::wprintf(L"평행이동 아카이브 추가 완료\n");
         {
             __int64 elapsedSeconds = (getNanoTimer() - startTransTime) / 1e9;
@@ -786,6 +945,71 @@ export struct Func
         hasFourierRef = true;
     }
 
+    void saveFourierRef2()
+    {
+        for (int i = 0; i < 2; i++)
+        {
+            const int RESOLUTION = 256;
+            double dx = 0;
+            int xAngle = 0;
+            if (i == 1)
+            {
+                xAngle = 140;
+                dx = 3;
+            }
+            std::wprintf(L"xAngle = %d\n", xAngle);
+            Eigen::Matrix3d inputRot = angleToMatrix(xAngle, 0, 0);
+            std::vector<Point> targetPoints = myPoints; // 백업
+            latticeRotation(targetPoints, latticeConstant, inputRot); // 결정구조 회전 후 나간 입자 제거 및 빈 공간은 다시 채움(주기조건)
+            latticeTranslation(targetPoints, latticeConstant, { dx, 0, 0 });
+            Eigen::Tensor<std::complex<double>, 3> resultFFT = convertToDensityFuncAndFFT2(targetPoints, latticeConstant, RESOLUTION);
+
+            std::map<double, std::array<int, 3>> localPeakList;
+            for (int x = 1; x < RESOLUTION - 1; x++)
+            {
+                for (int y = 1; y < RESOLUTION - 1; y++)
+                {
+                    for (int z = 1; z < RESOLUTION - 1; z++)
+                    {
+                        bool isLocalPeak = true;
+                        double currentVal = std::abs(resultFFT(x, y, z));
+
+                        for (int dx = -1; dx <= 1; dx++)
+                        {
+                            for (int dy = -1; dy <= 1; dy++)
+                            {
+                                for (int dz = -1; dz <= 1; dz++)
+                                {
+                                    if (dx == 0 && dy == 0 && dz == 0) continue;
+                                    if (currentVal < std::abs(resultFFT(x + dx, y + dy, z + dz)))
+                                    {
+                                        isLocalPeak = false;
+                                        break;
+                                    }
+                                }
+                                if (!isLocalPeak) break;
+                            }
+                            if (!isLocalPeak) break;
+                        }
+
+                        if (isLocalPeak) localPeakList[currentVal] = { x - RESOLUTION / 2 + 1, y - RESOLUTION / 2 + 1, z - RESOLUTION / 2 + 1 };
+                    }
+                }
+            }
+
+            std::wprintf(L"Local peaks for xAngle = %d:\n", xAngle);
+            int repeat = 0;
+            for (auto it = localPeakList.rbegin(); it != localPeakList.rend(); ++it)
+            {
+                repeat++;
+                const auto& peak = *it;
+                if (repeat > 5) break;
+                std::wprintf(L"%d : Peak at (%d, %d, %d) with magnitude %f\n", repeat, peak.second[0], peak.second[1], peak.second[2], peak.first);
+            }
+        }
+        std::wprintf(L"새로운 Fourier reference가 성공적으로 추가되었다.\n");
+        hasFourierRef = true;
+    }
 
     double calcMSELossAmpFFT(const std::vector<std::array<std::complex<double>, 4>>& firstFFT, const std::vector<std::array<std::complex<double>, 4>>& secondFFT)
     {
@@ -969,6 +1193,25 @@ export struct Func
             }
         }
         return hammingWindow;
+    }
+
+    Eigen::Tensor<double, 3> createBlackmanWindow(int gridSize)
+    {
+        Eigen::Tensor<double, 3> blackmanWindow(gridSize, gridSize, gridSize);
+        for (int i = 0; i < gridSize; ++i)
+        {
+            for (int j = 0; j < gridSize; ++j)
+            {
+                for (int k = 0; k < gridSize; ++k)
+                {
+                    double wx = 0.42 - 0.5 * std::cos(2 * M_PI * i / (gridSize - 1)) + 0.08 * std::cos(4 * M_PI * i / (gridSize - 1));
+                    double wy = 0.42 - 0.5 * std::cos(2 * M_PI * j / (gridSize - 1)) + 0.08 * std::cos(4 * M_PI * j / (gridSize - 1));
+                    double wz = 0.42 - 0.5 * std::cos(2 * M_PI * k / (gridSize - 1)) + 0.08 * std::cos(4 * M_PI * k / (gridSize - 1));
+                    blackmanWindow(i, j, k) = wx * wy * wz;
+                }
+            }
+        }
+        return blackmanWindow;
     }
 
     void invariablize()

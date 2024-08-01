@@ -45,3 +45,6 @@ export bool hasFourierRef = false;
 
 export std::vector<std::pair<Point, std::vector<std::array<std::complex<double>, 4>>>> fourierAngleSave;
 export std::vector<std::pair<Point, std::vector<std::array<std::complex<double>, 4>>>> fourierTransSave;
+
+export std::vector<std::pair<Point, std::vector<std::array<std::complex<double>, 4>>>> fourierTransSaveX;
+export std::vector<std::pair<Point, std::vector<std::array<std::complex<double>, 4>>>> fourierAngleSaveX;

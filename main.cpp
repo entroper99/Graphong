@@ -168,6 +168,10 @@ int main(int argc, char** argv)
             std::wprintf(L"\033[0;33m36.푸리에변환 레퍼런스 입력\033[0m\n");
             std::wprintf(L"\033[0;33m37.푸리에변환 Amplitude Spectrum 회전행렬 구하기\033[0m\n");
             std::wprintf(L"\033[0;33m38.푸리에변환 Phase Spectrum 평행이동벡터 구하기\033[0m\n");
+            std::wprintf(L"\033[0;33m39.불변화 테스트\033[0m\n");
+            std::wprintf(L"\033[0;33m40 위상 변화 테스트\033[0m\n");
+            std::wprintf(L"\033[0;33m41. 회전 변화 테스트\033[0m\n");
+            std::wprintf(L"\033[0;33m42. 128px 푸리에변환\033[0m\n");
             std::wprintf(L"------------------▼아래에 값 입력-----------------\n");
 
             int input = 0;
@@ -1179,7 +1183,7 @@ int main(int argc, char** argv)
                             tgtGyroid->scalarCalc();
                             originGraphFunc->myPoints.push_back({ (double)i,tgtGyroid->scalarSquareAvg(),0 });
                             double originF = tgtGyroid->scalarSquareAvg();
-                            
+
                             double lat = tgtGyroid->latticeConstant;
                             Eigen::Vector3d inputVec = { randomRangeFloat(-lat / 2.0,lat / 2.0),randomRangeFloat(-lat / 2.0,lat / 2.0),randomRangeFloat(-lat / 2.0,lat / 2.0) };
                             tgtGyroid->translation(tgtGyroid->myPoints, inputVec);
@@ -1212,7 +1216,7 @@ int main(int argc, char** argv)
                             tgtGyroid->scalarCalc();
 
                             timeGraphFunc->myPoints.push_back({ (double)i,tgtGyroid->scalarSquareAvg(),0 });
-                            std::wprintf(L"TIME %d : 원본 f값은 %f이고 변형 f값은 %f이다.\n", i, originF,tgtGyroid->scalarSquareAvg());
+                            std::wprintf(L"TIME %d : 원본 f값은 %f이고 변형 f값은 %f이다.\n", i, originF, tgtGyroid->scalarSquareAvg());
                             delete tgtGyroid;
 
                             size_t firstTimestepPos = str.find("ITEM: TIMESTEP");
@@ -1225,6 +1229,63 @@ int main(int argc, char** argv)
                     else std::wprintf(L"파일을 읽는데 실패하였습니다.\n");
 
                 }
+            }
+            else if (input == 40)
+            {
+                if (hasFourierRef)
+                {
+                    for (int i = funcSet.size() - 1; i >= 0; i--) delete funcSet[i];
+                    funcSet.clear();
+
+                    for (int i = 0; i < fourierTransSaveX.size(); i++)
+                    {
+                        Func* tgtFunc = new Func(funcFlag::dim2);
+                        tgtFunc->myColor = rainbow((double)i*0.7 / (double)fourierTransSaveX.size());
+                        std::vector<std::array<std::complex<double>, 4>> fourierTargetX = fourierTransSaveX[i].second;
+                        for (int j = 0; j < fourierTargetX.size(); j++)
+                        {
+                            tgtFunc->myPoints.push_back({ (double)fourierTargetX[j][0].real(),std::arg(fourierTargetX[j][3]),0 });
+                        }
+
+                        std::sort(tgtFunc->myPoints.begin(), tgtFunc->myPoints.end(), [](const Point& a, const Point& b) {
+                            return a.x < b.x;
+                            });
+                    }
+                }
+            }
+            else if (input == 41)
+            {
+                if (hasFourierRef)
+                {
+                    for (int i = funcSet.size() - 1; i >= 0; i--) delete funcSet[i];
+                    funcSet.clear();
+
+                    for (int i = 0; i < fourierAngleSaveX.size(); i++)
+                    {
+                        Func* tgtFunc = new Func(funcFlag::dim3);
+                        tgtFunc->myColor = rainbow((double)i * 0.7 / (double)fourierAngleSaveX.size());
+                        std::vector<std::array<std::complex<double>, 4>> fourierTargetX = fourierAngleSaveX[i].second;
+                        for (int j = 0; j < fourierTargetX.size(); j++)
+                        {
+                            tgtFunc->myPoints.push_back({ (double)fourierTargetX[j][0].real(),(double)fourierTargetX[j][1].real(),std::abs(fourierTargetX[j][3]) });
+                        }
+
+                        std::sort(tgtFunc->myPoints.begin(), tgtFunc->myPoints.end(), [](const Point& a, const Point& b) {
+                            return a.x < b.x;
+                            });
+                    }
+                }
+            }
+            else if (input == 42)
+            {
+                int dataIndex = 0;
+                if (funcSet.size() > 1)
+                {
+                    std::wprintf(L"몇번째 데이터를 레퍼런스 값으로 설정할까? (0 ~ %d).\n", funcSet.size() - 1);
+                    prtFuncName();
+                    std::cin >> dataIndex;
+                }
+                ((Func*)funcSet[dataIndex])->saveFourierRef2();
             }
             else std::wprintf(L"잘못된 값이 입력되었다.\n");
         }

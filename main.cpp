@@ -172,6 +172,7 @@ int main(int argc, char** argv)
             std::wprintf(L"\033[0;33m40 위상 변화 테스트\033[0m\n");
             std::wprintf(L"\033[0;33m41. 회전 변화 테스트\033[0m\n");
             std::wprintf(L"\033[0;33m42. 128px 푸리에변환\033[0m\n");
+            std::wprintf(L"\033[0;33m43. 결정구조 곡률 분석\033[0m\n");
             std::wprintf(L"------------------▼아래에 값 입력-----------------\n");
 
             int input = 0;
@@ -1186,7 +1187,7 @@ int main(int argc, char** argv)
 
                             double lat = tgtGyroid->latticeConstant;
                             Eigen::Vector3d inputVec = { randomRangeFloat(-lat / 2.0,lat / 2.0),randomRangeFloat(-lat / 2.0,lat / 2.0),randomRangeFloat(-lat / 2.0,lat / 2.0) };
-                            tgtGyroid->translation(tgtGyroid->myPoints, inputVec);
+                            tgtGyroid->latticeTranslation(tgtGyroid->myPoints, tgtGyroid->latticeConstant, inputVec); //랜덤 평행이동
 
                             double xAngle = randomRangeFloat(0, 360.0);
                             double yAngle = randomRangeFloat(0, 360.0);
@@ -1209,14 +1210,64 @@ int main(int argc, char** argv)
                                 sin(zRad), cos(zRad), 0,
                                 0, 0, 1;
                             Eigen::Matrix3d inputRot = rotZ * rotY * rotX;
-                            tgtGyroid->rotation(tgtGyroid->myPoints, inputRot);
+                            tgtGyroid->latticeRotation(tgtGyroid->myPoints, tgtGyroid->latticeConstant, inputRot); //랜덤 회전
 
                             std::wprintf(L"TIME %d : 랜덤 평행이동 : (%f,%f,%f), 랜덤 회전 : (%f,%f,%f)\n", i, inputVec[0], inputVec[1], inputVec[2], xAngle, yAngle, zAngle);
-                            tgtGyroid->invariablize();
-                            tgtGyroid->scalarCalc();
 
-                            timeGraphFunc->myPoints.push_back({ (double)i,tgtGyroid->scalarSquareAvg(),0 });
-                            std::wprintf(L"TIME %d : 원본 f값은 %f이고 변형 f값은 %f이다.\n", i, originF, tgtGyroid->scalarSquareAvg());
+                            const int RESOLUTION = 128;
+                            Eigen::Tensor<std::complex<double>, 3> resultFFT = tgtGyroid->convertToDensityFuncAndFFT2(tgtGyroid->myPoints, tgtGyroid->latticeConstant, RESOLUTION);
+                            std::map<double, std::array<int, 3>> localPeakList;
+                            for (int x = 1; x < RESOLUTION - 1; x++)
+                            {
+                                for (int y = 1; y < RESOLUTION - 1; y++)
+                                {
+                                    for (int z = 1; z < RESOLUTION - 1; z++)
+                                    {
+                                        bool isLocalPeak = true;
+                                        double currentVal = std::abs(resultFFT(x, y, z));
+
+                                        for (int dx = -1; dx <= 1; dx++)
+                                        {
+                                            for (int dy = -1; dy <= 1; dy++)
+                                            {
+                                                for (int dz = -1; dz <= 1; dz++)
+                                                {
+                                                    if (dx == 0 && dy == 0 && dz == 0) continue;
+                                                    if (currentVal < std::abs(resultFFT(x + dx, y + dy, z + dz)))
+                                                    {
+                                                        isLocalPeak = false;
+                                                        break;
+                                                    }
+                                                }
+                                                if (!isLocalPeak) break;
+                                            }
+                                            if (!isLocalPeak) break;
+                                        }
+
+                                        if (isLocalPeak) localPeakList[currentVal] = { x - RESOLUTION / 2 + 1, y - RESOLUTION / 2 + 1, z - RESOLUTION / 2 + 1 };
+                                    }
+                                }
+                            }
+
+                            int repeat = 0;
+                            double secondPeakVal = 0;
+                            for (auto it = localPeakList.rbegin(); it != localPeakList.rend(); ++it)
+                            {
+                                repeat++;
+                                const auto& peak = *it;
+                                if (repeat > 5) break;
+                                if (repeat == 2)
+                                {
+                                    std::wprintf(L"%d : Peak at (%d, %d, %d) with magnitude %f, 해당 피크를 저장했다.\n", repeat, peak.second[0], peak.second[1], peak.second[2], peak.first);
+                                    secondPeakVal = peak.first;
+                                }
+                                else
+                                {
+                                    std::wprintf(L"%d : Peak at (%d, %d, %d) with magnitude %f\n", repeat, peak.second[0], peak.second[1], peak.second[2], peak.first);
+                                }
+                            }
+
+                            timeGraphFunc->myPoints.push_back({ (double)i,secondPeakVal,0 });
                             delete tgtGyroid;
 
                             size_t firstTimestepPos = str.find("ITEM: TIMESTEP");
@@ -1287,6 +1338,135 @@ int main(int argc, char** argv)
                 }
                 ((Func*)funcSet[dataIndex])->saveFourierRef2();
             }
+            else if (input == 43)
+            {
+                for (int atomType = 2; atomType <= 2; atomType++)//원자2만 진행하도록
+                {
+                    std::wstring file = L"";
+                    std::wprintf(L"데이터가 있는 파일을 선택해주세요.\n");
+                    file = openFileDialog();
+                    std::wprintf(L"파일 %ls 를 대상으로 설정하였다.\n", file.c_str());
+                    std::ifstream in(file);
+                    if (in.is_open())
+                    {
+                        std::string str;
+                        in.seekg(0, std::ios::end);
+                        size_t size = in.tellg();
+                        str.resize(size);
+                        in.seekg(0, std::ios::beg);
+                        in.read(&str[0], size);
+                        in.close();
+
+                        Func* timeGraphFunc = new Func(funcFlag::scalarField);
+                        timeGraphFunc->funcType = funcFlag::dim2;
+                        timeGraphFunc->funcName = L"평균";
+                        std::wprintf(L"첫번째 F_avg의 색을 뭘로 할까?\n");
+                        timeGraphFunc->myColor = rainbow(0);
+
+                        Func* timeGraphFunc2 = new Func(funcFlag::scalarField);
+                        timeGraphFunc2->funcType = funcFlag::dim2;
+                        timeGraphFunc2->funcName = L"분산";
+                        std::wprintf(L"두번째 F_avg의 색을 뭘로 할까?\n");
+                        timeGraphFunc2->myColor = rainbow(0.1);
+
+                        Func* timeGraphFunc3 = new Func(funcFlag::scalarField);
+                        timeGraphFunc3->funcType = funcFlag::dim2;
+                        timeGraphFunc3->funcName = L"편차";
+                        std::wprintf(L"세번째 F_avg의 색을 뭘로 할까?\n");
+                        timeGraphFunc3->myColor = rainbow(0.2);
+
+                        Func* timeGraphFunc4 = new Func(funcFlag::scalarField);
+                        timeGraphFunc4->funcType = funcFlag::dim2;
+                        timeGraphFunc4->funcName = L"첨도";
+                        std::wprintf(L"네번째 F_avg의 색을 뭘로 할까?\n");
+                        timeGraphFunc4->myColor = rainbow(0.35);
+
+                        Func* timeGraphFunc5 = new Func(funcFlag::scalarField);
+                        timeGraphFunc5->funcType = funcFlag::dim2;
+                        timeGraphFunc5->funcName = L"왜도";
+                        std::wprintf(L"다섯번째 F_avg의 색을 뭘로 할까?\n");
+                        timeGraphFunc5->myColor = rainbow(0.5);
+
+                        Func* timeGraphFunc6 = new Func(funcFlag::scalarField);
+                        timeGraphFunc6->funcType = funcFlag::dim2;
+                        timeGraphFunc6->funcName = L"컷오프";
+                        std::wprintf(L"여섯번째 F_avg의 색을 뭘로 할까?\n");
+                        timeGraphFunc6->myColor = rainbow(0.7);
+
+                        Func* originGraphFunc = new Func(funcFlag::scalarField);
+                        originGraphFunc->funcType = funcFlag::dim2;
+                        originGraphFunc->funcName = L"원본 F값";
+                        std::wprintf(L"원본 F_avg의 색을 뭘로 할까?\n");
+                        originGraphFunc->myColor = { 0xff,0xff,0xff };
+
+
+
+                        int i = 0;
+                        while (1)
+                        {
+                            readTrjString(str, 9, -1, 2, 3, 4, 1, atomType);
+                            Func* tgtGyroid = ((Func*)funcSet[funcSet.size() - 1]);
+                            double length = BOX_SIZE / 2.0;
+                            double scaleFactor = 2.0 * M_PI / length;
+                            tgtGyroid->scalarFunc = [=](double x, double y, double z)->double
+                                {
+                                    return (std::cos(scaleFactor * x) * std::sin(scaleFactor * y) * std::sin(2 * (scaleFactor * z)) + std::cos(scaleFactor * y) * std::sin(scaleFactor * z) * std::sin(2 * (scaleFactor * x)) + std::cos(scaleFactor * z) * std::sin(scaleFactor * x) * std::sin(2 * (scaleFactor * y)));
+                                };
+                            tgtGyroid->translation(-BOX_SIZE / 2.0, -BOX_SIZE / 2.0, -BOX_SIZE / 2.0);
+                            tgtGyroid->latticeConstant = BOX_SIZE;// / 2.0;
+                            tgtGyroid->scalarCalc();
+                            originGraphFunc->myPoints.push_back({ (double)i,tgtGyroid->scalarSquareAvg(),0 });
+                            double originF = tgtGyroid->scalarSquareAvg();
+
+                            double lat = tgtGyroid->latticeConstant;
+                            Eigen::Vector3d inputVec = { randomRangeFloat(-lat / 2.0,lat / 2.0),randomRangeFloat(-lat / 2.0,lat / 2.0),randomRangeFloat(-lat / 2.0,lat / 2.0) };
+                            tgtGyroid->latticeTranslation(tgtGyroid->myPoints, tgtGyroid->latticeConstant, inputVec); //랜덤 평행이동
+
+                            double xAngle = randomRangeFloat(0, 360.0);
+                            double yAngle = randomRangeFloat(0, 360.0);
+                            double zAngle = randomRangeFloat(0, 360.0);
+
+                            double xRad = xAngle * DEGREE_TO_RADIAN;
+                            double yRad = yAngle * DEGREE_TO_RADIAN;
+                            double zRad = zAngle * DEGREE_TO_RADIAN;
+
+                            Eigen::Matrix3d rotX, rotY, rotZ;
+                            rotX << 1, 0, 0,
+                                0, cos(xRad), -sin(xRad),
+                                0, sin(xRad), cos(xRad);
+
+                            rotY << cos(yRad), 0, sin(yRad),
+                                0, 1, 0,
+                                -sin(yRad), 0, cos(yRad);
+
+                            rotZ << cos(zRad), -sin(zRad), 0,
+                                sin(zRad), cos(zRad), 0,
+                                0, 0, 1;
+                            Eigen::Matrix3d inputRot = rotZ * rotY * rotX;
+                            tgtGyroid->latticeRotation(tgtGyroid->myPoints, tgtGyroid->latticeConstant, inputRot); //랜덤 회전
+
+                            std::wprintf(L"TIME %d : 랜덤 평행이동 : (%f,%f,%f), 랜덤 회전 : (%f,%f,%f)\n", i, inputVec[0], inputVec[1], inputVec[2], xAngle, yAngle, zAngle);
+
+                            std::array<double,6> result = tgtGyroid->calcCurvature(tgtGyroid->myPoints, tgtGyroid->latticeConstant, 128);
+                            timeGraphFunc->myPoints.push_back({ (double)i,result[0],0 });
+                            timeGraphFunc2->myPoints.push_back({ (double)i,result[1],0 });
+                            timeGraphFunc3->myPoints.push_back({ (double)i,result[2],0 });
+                            timeGraphFunc4->myPoints.push_back({ (double)i,result[3],0 });
+                            timeGraphFunc5->myPoints.push_back({ (double)i,result[4],0 });
+                            timeGraphFunc6->myPoints.push_back({ (double)i,result[5],0 });
+                            delete tgtGyroid;
+
+                            size_t firstTimestepPos = str.find("ITEM: TIMESTEP");
+                            size_t secondTimestepPos = str.find("ITEM: TIMESTEP", firstTimestepPos + 1);
+                            if (secondTimestepPos == std::string::npos) break;
+                            else str = str.substr(secondTimestepPos);
+                            i++;
+                        }
+                    }
+                    else std::wprintf(L"파일을 읽는데 실패하였습니다.\n");
+
+                }
+                }
             else std::wprintf(L"잘못된 값이 입력되었다.\n");
         }
 

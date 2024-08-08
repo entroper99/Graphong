@@ -16,7 +16,7 @@ import utilMath;
 import nanoTimer;
 import ThreadPool;
 
-        std::mutex density_mutex;
+std::mutex density_mutex;
 
 export struct Func
 {
@@ -606,36 +606,12 @@ export struct Func
 
     std::vector<std::array<std::complex<double>, 4>> convertToDensityFuncAndFFT(const std::vector<Point>& inputPoints, double inputLatticeConstant, int inputGridSize)
     {
-        double gaussAmp = 1.0;
-        double gaussSig = 1.0;
-        std::vector<std::array<double, 4>> densityFunc;
         double del = inputLatticeConstant / (inputGridSize - 1);
         int gridSize = inputGridSize * inputGridSize * inputGridSize;
 
         Eigen::Tensor<double, 3> density(inputGridSize, inputGridSize, inputGridSize);
         density.setZero();
-
-        int idx = 0;
-        for (double tgtX = -inputLatticeConstant / 2.0; tgtX <= inputLatticeConstant / 2.0; tgtX += del)
-        {
-            for (double tgtY = -inputLatticeConstant / 2.0; tgtY <= inputLatticeConstant / 2.0; tgtY += del)
-            {
-                for (double tgtZ = -inputLatticeConstant / 2.0; tgtZ <= inputLatticeConstant / 2.0; tgtZ += del)
-                {
-                    double densityValue = 0;
-                    for (const auto& point : inputPoints)
-                    {
-                        densityValue += calcGaussian(point.x - tgtX, point.y - tgtY, point.z - tgtZ, gaussSig, gaussAmp);
-                    }
-                    int xIdx = std::round((tgtX + inputLatticeConstant / 2.0) / del);
-                    int yIdx = std::round((tgtY + inputLatticeConstant / 2.0) / del);
-                    int zIdx = std::round((tgtZ + inputLatticeConstant / 2.0) / del);
-                    density(xIdx, yIdx, zIdx) = densityValue;
-                }
-            }
-        }
-
-        std::wprintf(L"밀도 함수 구성을 완료하였다.\n");
+        density = createDensityFunction(inputPoints, inputLatticeConstant, inputGridSize);
 
         Eigen::Tensor<double, 3> windowFunc = createBlackmanWindow(inputGridSize);
         density = density * windowFunc;
@@ -654,7 +630,7 @@ export struct Func
             return {};
         }
 
-        idx = 0;
+        int idx = 0;
         for (int x = 0; x < inputGridSize; ++x)
         {
             for (int y = 0; y < inputGridSize; ++y)
@@ -713,25 +689,23 @@ export struct Func
         return fourierResult;
     }
 
-
-    Eigen::Tensor<std::complex<double>, 3> convertToDensityFuncAndFFT2(const std::vector<Point>& inputPoints, double inputLatticeConstant, int inputGridSize)
+    Eigen::Tensor<double, 3> createDensityFunction(const std::vector<Point>& inputPoints, double inputLatticeConstant, int inputGridSize)
     {
+        __int64 startTime = getNanoTimer();
+
         double gaussAmp = 1.0;
-        double gaussSig = 1.0;
-        std::vector<std::array<double, 4>> densityFunc;
+        double gaussSig = 0.68;
         double del = inputLatticeConstant / (inputGridSize - 1);
         int gridSize = inputGridSize * inputGridSize * inputGridSize;
-
         Eigen::Tensor<double, 3> density(inputGridSize, inputGridSize, inputGridSize);
         density.setZero();
 
-
-        std::mutex density_mutex;
+        std::mutex mutex;
         int totalSize = inputGridSize * inputGridSize * inputGridSize;
         int numThreads = std::thread::hardware_concurrency();
         int blockSize = totalSize / numThreads;
 
-        auto calculateDensityPart = [&density, &inputPoints, inputLatticeConstant, del, gaussSig, gaussAmp, inputGridSize,&density_mutex](int startIdx, int endIdx)
+        auto calculateDensityPart = [&density, &inputPoints, inputLatticeConstant, del, gaussSig, gaussAmp, inputGridSize, &mutex](int startIdx, int endIdx)
             {
                 for (int i = startIdx; i < endIdx; ++i)
                 {
@@ -744,11 +718,7 @@ export struct Func
                     double tgtZ = zIdx * del - inputLatticeConstant / 2.0;
 
                     double densityValue = 0;
-                    for (const auto& point : inputPoints)
-                    {
-                        densityValue += calcGaussian(point.x - tgtX, point.y - tgtY, point.z - tgtZ, gaussSig, gaussAmp);
-                    }
-
+                    for (const auto& point : inputPoints) densityValue += calcGaussian(point.x - tgtX, point.y - tgtY, point.z - tgtZ, gaussSig, gaussAmp);
                     density(xIdx, yIdx, zIdx) = densityValue;
                 }
             };
@@ -760,32 +730,127 @@ export struct Func
             int endIdx = (i == numThreads - 1) ? totalSize : startIdx + blockSize;
             threads.emplace_back(calculateDensityPart, startIdx, endIdx);
         }
-
         for (auto& thread : threads)  thread.join();
+        
+        {
+            __int64 elapsedSeconds = (getNanoTimer() - startTime) / 1e9;
+            int hours = elapsedSeconds / 3600;
+            int minutes = (elapsedSeconds % 3600) / 60;
+            int seconds = elapsedSeconds % 60;
+            std::wprintf(L"밀도함수 구성에 걸린 시간 : %02d시간 %02d분 %02d초\n", hours, minutes, seconds);
+        }
+        return density;
+
+    }
+
+    std::array<double,6> calcCurvature(const std::vector<Point>& inputPoints, double inputLatticeConstant, int inputGridSize)
+    {
+        double del = inputLatticeConstant / (inputGridSize - 1);
+        double delSquared = del * del;
+        int gridSize = inputGridSize * inputGridSize * inputGridSize;
+        Eigen::Tensor<double, 3> density(inputGridSize, inputGridSize, inputGridSize);
+        density = createDensityFunction(inputPoints, inputLatticeConstant, inputGridSize);
+        Eigen::Tensor<double, 3> laplacian(inputGridSize-2, inputGridSize-2, inputGridSize-2);
+        laplacian.setZero();
+        for (int x = 1; x < inputGridSize - 1; x++)
+        {
+            for (int y = 1; y < inputGridSize - 1; y++)
+            {
+                for (int z = 1; z < inputGridSize - 1; z++)
+                {
+                    laplacian(x - 1, y - 1, z - 1) += (density(x + 1, y, z) - 2 * density(x, y, z) + density(x - 1, y, z));
+                    laplacian(x - 1, y - 1, z - 1) += (density(x, y + 1, z) - 2 * density(x, y, z) + density(x, y - 1, z));
+                    laplacian(x - 1, y - 1, z - 1) += (density(x, y, z + 1) - 2 * density(x, y, z) + density(x, y, z - 1));
+                    laplacian(x - 1, y - 1, z - 1) /= delSquared;
+                }
+            }
+        }
+
+        double variance = 0.0;
+        double totalVal = 0.0;
+        for (int x = 0; x < inputGridSize - 2; x++)
+        {
+            for (int y = 0; y < inputGridSize - 2; y++)
+            {
+                for (int z = 0; z < inputGridSize - 2; z++)
+                {
+                    totalVal += laplacian(x, y, z);
+                }
+            }
+        }
+        double mean = totalVal / (double)laplacian.size();
+        for (int x = 0; x < inputGridSize - 2; x++)
+        {
+            for (int y = 0; y < inputGridSize - 2; y++)
+            {
+                for (int z = 0; z < inputGridSize - 2; z++)
+                {
+                    variance += std::pow(laplacian(x, y, z) - mean, 2.0);
+                }
+            }
+        }
+        variance /= (double)laplacian.size();
+        double stddev = std::sqrt(variance);
+        std::wprintf(L"[1/5] 분산은 %f이다.\n", variance);
+        std::wprintf(L"[2/5] 표준편차는 %f이다.\n", stddev);
+
+        double kurtosis = 0.0;
+        for (int x = 0; x < inputGridSize - 2; x++)
+        {
+            for (int y = 0; y < inputGridSize - 2; y++)
+            {
+                for (int z = 0; z < inputGridSize - 2; z++)
+                {
+                    kurtosis += std::pow((laplacian(x, y, z) - mean)/ stddev, 4.0);
+                }
+            }
+        }
+        kurtosis /= (double)laplacian.size();
+        kurtosis -= 3.0;
+        std::wprintf(L"[3/5] 첨도는 %f이다.\n", kurtosis);
+
+        double skewness = 0.0;
+        for (int x = 0; x < inputGridSize - 2; x++)
+        {
+            for (int y = 0; y < inputGridSize - 2; y++)
+            {
+                for (int z = 0; z < inputGridSize - 2; z++)
+                {
+                    skewness += std::pow((laplacian(x, y, z) - mean) / stddev, 3.0);
+                }
+            }
+        }
+        skewness /= (double)laplacian.size();
+        std::wprintf(L"[4/5] 왜도는 %f이다.\n", skewness);
 
 
-        //for (double tgtX = -inputLatticeConstant / 2.0; tgtX <= inputLatticeConstant / 2.0; tgtX += del)
-        //{
-        //    for (double tgtY = -inputLatticeConstant / 2.0; tgtY <= inputLatticeConstant / 2.0; tgtY += del)
-        //    {
-        //        for (double tgtZ = -inputLatticeConstant / 2.0; tgtZ <= inputLatticeConstant / 2.0; tgtZ += del)
-        //        {
-        //            double densityValue = 0;
-        //            for (const auto& point : inputPoints)
-        //            {
-        //                densityValue += calcGaussian(point.x - tgtX, point.y - tgtY, point.z - tgtZ, gaussSig, gaussAmp);
-        //            }
-        //            int xIdx = std::round((tgtX + inputLatticeConstant / 2.0) / del);
-        //            int yIdx = std::round((tgtY + inputLatticeConstant / 2.0) / del);
-        //            int zIdx = std::round((tgtZ + inputLatticeConstant / 2.0) / del);
-        //            density(xIdx, yIdx, zIdx) = densityValue;
-        //        }
-        //    }
-        //}
 
-        std::wprintf(L"밀도 함수 구성을 완료하였다.\n");
+        int number = 0;
+        double cutoff = 4.2;
+        for (int x = 0; x < inputGridSize - 2; x++)
+        {
+            for (int y = 0; y < inputGridSize - 2; y++)
+            {
+                for (int z = 0; z < inputGridSize - 2; z++)
+                {
+                    if (laplacian(x, y, z) > cutoff) number++;
+                }
+            }
+        }
+        std::wprintf(L"[5/5] 컷오프 %f를 넘은 원자의 숫자는 %d개이다.\n", cutoff, number);
 
-        Eigen::Tensor<double, 3> windowFunc = createHammingWindow(inputGridSize);
+
+        return { mean,variance,stddev,kurtosis,skewness,(double)number };
+    }
+
+    Eigen::Tensor<std::complex<double>, 3> convertToDensityFuncAndFFT2(const std::vector<Point>& inputPoints, double inputLatticeConstant, int inputGridSize)
+    {
+        double del = inputLatticeConstant / (inputGridSize - 1);
+        int gridSize = inputGridSize * inputGridSize * inputGridSize;
+
+        Eigen::Tensor<double, 3> density(inputGridSize, inputGridSize, inputGridSize);
+        density = createDensityFunction(inputPoints, inputLatticeConstant, inputGridSize);
+        Eigen::Tensor<double, 3> windowFunc = createBlackmanWindow(inputGridSize);
         density = density * windowFunc;
         std::wprintf(L"창함수를 곱하였다.\n");
 
@@ -949,19 +1014,19 @@ export struct Func
     {
         for (int i = 0; i < 2; i++)
         {
-            const int RESOLUTION = 256;
-            double dx = 0;
+            const int RESOLUTION = 128;
+            //double dx = 0;
             int xAngle = 0;
             if (i == 1)
             {
                 xAngle = 140;
-                dx = 3;
+                //dx = 3;
             }
             std::wprintf(L"xAngle = %d\n", xAngle);
             Eigen::Matrix3d inputRot = angleToMatrix(xAngle, 0, 0);
             std::vector<Point> targetPoints = myPoints; // 백업
             latticeRotation(targetPoints, latticeConstant, inputRot); // 결정구조 회전 후 나간 입자 제거 및 빈 공간은 다시 채움(주기조건)
-            latticeTranslation(targetPoints, latticeConstant, { dx, 0, 0 });
+            //latticeTranslation(targetPoints, latticeConstant, { dx, 0, 0 });
             Eigen::Tensor<std::complex<double>, 3> resultFFT = convertToDensityFuncAndFFT2(targetPoints, latticeConstant, RESOLUTION);
 
             std::map<double, std::array<int, 3>> localPeakList;
@@ -1231,7 +1296,6 @@ export struct Func
         latticeRotation(myPoints, latticeConstant, getRotationByFFT().inverse());
         latticeTranslation(myPoints, latticeConstant, -getTranslationByFFT());
     }
-
 };
 
 

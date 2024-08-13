@@ -136,12 +136,14 @@
   <ItemGroup>
     <ClCompile Include="constVar.ixx" />
     <ClCompile Include="cubicSpline.ixx" />
+    <ClCompile Include="curvatureDeviation.cpp" />
     <ClCompile Include="drawer.ixx" />
     <ClCompile Include="Func.ixx" />
     <ClCompile Include="globalVar.ixx" />
     <ClCompile Include="inputCol.ixx" />
     <ClCompile Include="main.cpp" />
     <ClCompile Include="nanoTimer.ixx" />
+    <ClCompile Include="stdevCurvature.ixx" />
     <ClCompile Include="ThreadPool.ixx" />
     <ClCompile Include="utilFile.ixx" />
     <ClCompile Include="utilMath.ixx" />

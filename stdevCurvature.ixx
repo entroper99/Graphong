@@ -6,8 +6,7 @@
 
 export module stdevCurvature;
 
-const int RESOLUTION = 128;
-
+const int RESOLUTION = 64;
 double calcGaussian(double dx, double dy, double dz, double sigma, double amplitude)
 {
     return amplitude * std::exp(-(dx * dx + dy * dy + dz * dz) / (2 * sigma * sigma));
@@ -139,4 +138,5 @@ export double calcStdevCurvature(const std::vector<std::array<double, 3>>& input
 
     return stdev;
 }
+
 

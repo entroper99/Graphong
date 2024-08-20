@@ -11,7 +11,6 @@ import std;
 import globalVar;
 import constVar;
 import Shapes;
-import randomRange;
 import utilMath;
 import nanoTimer;
 import ThreadPool;
@@ -1297,9 +1296,6 @@ export struct Func
         latticeRotation(myPoints, latticeConstant, getRotationByFFT().inverse());
         latticeTranslation(myPoints, latticeConstant, -getTranslationByFFT());
     }
+
 };
-
-
-
-
 

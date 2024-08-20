@@ -104,7 +104,7 @@ export int readXY(std::wstring file, int startLine, int endLine, int xCol, int y
         {
             if (enterNumber == startLine)
             {
-                std::wprintf(L"지금부터 숫자를 읽습니다.\n");
+                //std::wprintf(L"지금부터 숫자를 읽습니다.\n");
                 numberReadStart = true;
                 i--;
             }
@@ -120,7 +120,7 @@ export int readXY(std::wstring file, int startLine, int endLine, int xCol, int y
                 if ((str[i] >= UNI::ZERO && str[i] <= UNI::NINE) || str[i] == 0x2d || str[i] == UNI::PERIOD) numStartIndex = i;
                 else if ((str[i] >= UNI::A && str[i] <= UNI::Z) || (str[i] >= UNI::a && str[i] <= UNI::z))
                 {
-                    std::wprintf(L"파일 읽기를 완료하였다!\n");
+                    //std::wprintf(L"파일 읽기를 완료하였다!\n");
                     break;
                 }
             }
@@ -152,7 +152,7 @@ export int readXY(std::wstring file, int startLine, int endLine, int xCol, int y
     }
 
     targetFunc->myInterPoints = targetFunc->myPoints;
-    std::wprintf(L"추가한 함수의 점의 수는 %d개이고, 현재 %d개의 함수가 존재한다.\n", targetFunc->myPoints.size(), funcSet.size());
+    //std::wprintf(L"추가한 함수의 점의 수는 %d개이고, 현재 %d개의 함수가 존재한다.\n", targetFunc->myPoints.size(), funcSet.size());
     return funcSet.size() - 1;
 }
 
@@ -212,7 +212,7 @@ export int readXYZ(std::wstring file, int startLine, int endLine, int xCol, int 
         {
             if (enterNumber == startLine)
             {
-                std::wprintf(L"지금부터 숫자를 읽습니다.\n");
+                //std::wprintf(L"지금부터 숫자를 읽습니다.\n");
                 numberReadStart = true;
             }
             else
@@ -233,7 +233,7 @@ export int readXYZ(std::wstring file, int startLine, int endLine, int xCol, int 
                 }
                 else if ((str[i] >= UNI::A && str[i] <= UNI::Z) || (str[i] >= UNI::a && str[i] <= UNI::z))
                 {
-                    std::wprintf(L"파일 읽기를 완료하였다!\n");
+                    //std::wprintf(L"파일 읽기를 완료하였다!\n");
                     break;
                 }
             }
@@ -284,7 +284,7 @@ export int readXYZ(std::wstring file, int startLine, int endLine, int xCol, int 
     }
 
     targetFunc->myInterPoints = targetFunc->myPoints;
-    std::wprintf(L"추가한 함수의 점의 수는 %d개이고, 현재 %d개의 함수가 존재한다.\n", targetFunc->myPoints.size(), funcSet.size());
+    //std::wprintf(L"추가한 함수의 점의 수는 %d개이고, 현재 %d개의 함수가 존재한다.\n", targetFunc->myPoints.size(), funcSet.size());
     return funcSet.size() - 1;
 }
 
@@ -330,7 +330,7 @@ export int readTrjFile(std::wstring file, int startLine, int endLine, int xCol, 
         {
             if (enterNumber == startLine)
             {
-                std::wprintf(L"지금부터 숫자를 읽습니다.\n");
+                //std::wprintf(L"지금부터 숫자를 읽습니다.\n");
                 numberReadStart = true;
             }
             else
@@ -352,7 +352,7 @@ export int readTrjFile(std::wstring file, int startLine, int endLine, int xCol, 
                 }
                 else if ((str[i] >= UNI::A && str[i] <= UNI::Z) || (str[i] >= UNI::a && str[i] <= UNI::z))
                 {
-                    std::wprintf(L"파일 읽기를 완료하였다!\n");
+                    //std::wprintf(L"파일 읽기를 완료하였다!\n");
                     break;
                 }
             }
@@ -413,7 +413,7 @@ export int readTrjFile(std::wstring file, int startLine, int endLine, int xCol, 
         }
 
     }
-    std::wprintf(L"추가한 함수의 점의 수는 %d개이고, 현재 %d개의 함수가 존재한다.\n", targetFunc->myPoints.size(), funcSet.size());
+    //std::wprintf(L"추가한 함수의 점의 수는 %d개이고, 현재 %d개의 함수가 존재한다.\n", targetFunc->myPoints.size(), funcSet.size());
     return funcSet.size() - 1;
 }
 
@@ -449,7 +449,7 @@ export int readTrjString(std::string inputStr, int startLine, int endLine, int x
         {
             if (enterNumber == startLine)
             {
-                std::wprintf(L"지금부터 숫자를 읽습니다.\n");
+                //std::wprintf(L"지금부터 숫자를 읽습니다.\n");
                 numberReadStart = true;
             }
             else
@@ -471,7 +471,7 @@ export int readTrjString(std::string inputStr, int startLine, int endLine, int x
                 }
                 else if ((str[i] >= UNI::A && str[i] <= UNI::Z) || (str[i] >= UNI::a && str[i] <= UNI::z))
                 {
-                    std::wprintf(L"파일 읽기를 완료하였다!\n");
+                    //std::wprintf(L"파일 읽기를 완료하였다!\n");
                     break;
                 }
             }
@@ -532,7 +532,7 @@ export int readTrjString(std::string inputStr, int startLine, int endLine, int x
         }
 
     }
-    std::wprintf(L"추가한 함수의 점의 수는 %d개이고, 현재 %d개의 함수가 존재한다.\n", targetFunc->myPoints.size(), funcSet.size());
+    //std::wprintf(L"추가한 함수의 점의 수는 %d개이고, 현재 %d개의 함수가 존재한다.\n", targetFunc->myPoints.size(), funcSet.size());
     return funcSet.size() - 1;
 }
 

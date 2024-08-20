@@ -36,7 +36,6 @@ void prtFuncName()
     }
 }
 
-
 int main(int argc, char** argv)
 {
     _CrtSetDbgFlag(_CRTDBG_ALLOC_MEM_DF | _CRTDBG_LEAK_CHECK_DF);
@@ -174,6 +173,8 @@ int main(int argc, char** argv)
             std::wprintf(L"\033[0;33m41. 회전 변화 테스트\033[0m\n");
             std::wprintf(L"\033[0;33m42. 128px 푸리에변환\033[0m\n");
             std::wprintf(L"\033[0;33m43. 결정구조 곡률 분석\033[0m\n");
+            std::wprintf(L"\033[0;33m44. 결정구조 곡률 분석(편차만 출력)\033[0m\n");
+            std::wprintf(L"\033[0;33m45. 결정구조 곡률 히스토그램 출력\033[0m\n");
             std::wprintf(L"------------------▼아래에 값 입력-----------------\n");
 
             int input = 0;
@@ -1467,7 +1468,7 @@ int main(int argc, char** argv)
                     else std::wprintf(L"파일을 읽는데 실패하였습니다.\n");
                 }
             }
-            else if (input == 44)
+            else if (input == 44)//편차만 출력
             {
                 for (int atomType = 2; atomType <= 2; atomType++)//원자2만 진행하도록
                 {
@@ -1559,6 +1560,114 @@ int main(int argc, char** argv)
                     else std::wprintf(L"파일을 읽는데 실패하였습니다.\n");
                 }
             }
+            else if (input == 45)
+            {
+                for (int atomType = 2; atomType <= 2; atomType++)//원자2만 진행하도록
+                {
+                    std::wstring file = L"";
+                    std::wprintf(L"데이터가 있는 파일을 선택해주세요.\n");
+                    file = openFileDialog();
+                    std::wprintf(L"파일 %ls 를 대상으로 설정하였다.\n", file.c_str());
+                    std::ifstream in(file);
+                    if (in.is_open())
+                    {
+                        std::string str;
+                        in.seekg(0, std::ios::end);
+                        size_t size = in.tellg();
+                        str.resize(size);
+                        in.seekg(0, std::ios::beg);
+                        in.read(&str[0], size);
+                        in.close();
+
+
+                        Func* unorderFunc = new Func(funcFlag::scalarField);
+                        unorderFunc->funcType = funcFlag::dim2;
+                        unorderFunc->funcName = L"무질서";
+                        unorderFunc->myColor = rainbow(0.2);
+
+                        Func* orderFunc = new Func(funcFlag::scalarField);
+                        orderFunc->funcType = funcFlag::dim2;
+                        orderFunc->funcName = L"자이로이드";
+                        orderFunc->myColor = { 0xff,0xff,0xff };
+
+                        int i = 0;
+                        while (1)
+                        {
+
+                            readTrjString(str, 9, -1, 2, 3, 4, 1, atomType);
+                            Func* tgtGyroid = ((Func*)funcSet[funcSet.size() - 1]);
+                            double length = BOX_SIZE / 2.0;
+                            double scaleFactor = 2.0 * M_PI / length;
+                            tgtGyroid->scalarFunc = [=](double x, double y, double z)->double
+                                {
+                                    return (std::cos(scaleFactor * x) * std::sin(scaleFactor * y) * std::sin(2 * (scaleFactor * z)) + std::cos(scaleFactor * y) * std::sin(scaleFactor * z) * std::sin(2 * (scaleFactor * x)) + std::cos(scaleFactor * z) * std::sin(scaleFactor * x) * std::sin(2 * (scaleFactor * y)));
+                                };
+                            tgtGyroid->translation(-BOX_SIZE / 2.0, -BOX_SIZE / 2.0, -BOX_SIZE / 2.0);
+                            tgtGyroid->latticeConstant = BOX_SIZE;// / 2.0;
+                            tgtGyroid->scalarCalc();
+                            double originF = tgtGyroid->scalarSquareAvg();
+
+                            double lat = tgtGyroid->latticeConstant;
+                            Eigen::Vector3d inputVec = { randomRangeFloat(-lat / 2.0,lat / 2.0),randomRangeFloat(-lat / 2.0,lat / 2.0),randomRangeFloat(-lat / 2.0,lat / 2.0) };
+                            tgtGyroid->latticeTranslation(tgtGyroid->myPoints, tgtGyroid->latticeConstant, inputVec); //랜덤 평행이동
+
+                            double xAngle = randomRangeFloat(0, 360.0);
+                            double yAngle = randomRangeFloat(0, 360.0);
+                            double zAngle = randomRangeFloat(0, 360.0);
+
+                            double xRad = xAngle * DEGREE_TO_RADIAN;
+                            double yRad = yAngle * DEGREE_TO_RADIAN;
+                            double zRad = zAngle * DEGREE_TO_RADIAN;
+
+                            Eigen::Matrix3d rotX, rotY, rotZ;
+                            rotX << 1, 0, 0,
+                                0, cos(xRad), -sin(xRad),
+                                0, sin(xRad), cos(xRad);
+
+                            rotY << cos(yRad), 0, sin(yRad),
+                                0, 1, 0,
+                                -sin(yRad), 0, cos(yRad);
+
+                            rotZ << cos(zRad), -sin(zRad), 0,
+                                sin(zRad), cos(zRad), 0,
+                                0, 0, 1;
+                            Eigen::Matrix3d inputRot = rotZ * rotY * rotX;
+                            tgtGyroid->latticeRotation(tgtGyroid->myPoints, tgtGyroid->latticeConstant, inputRot); //랜덤 회전
+
+                            if (i == 0 || i == 150)
+                            {
+                                std::wprintf(L"TIME %d : 랜덤 평행이동 : (%f,%f,%f), 랜덤 회전 : (%f,%f,%f)\n", i, inputVec[0], inputVec[1], inputVec[2], xAngle, yAngle, zAngle);
+                                std::vector<std::array<double, 3>> tgtPoints;
+                                for (int i = 0; i < tgtGyroid->myPoints.size(); i++) tgtPoints.push_back({ tgtGyroid->myPoints[i].x,tgtGyroid->myPoints[i].y,tgtGyroid->myPoints[i].z });
+                                std::vector<std::array<double, 3>> result = calcLaplacianHistogram(tgtPoints, tgtGyroid->latticeConstant);
+                                for (int j = 0; j < result.size(); j++)
+                                {
+                                    if (i == 0)
+                                    {
+                                        std::wprintf(L"점 (%f,%f,%f)를 함수에 넣었다.\n", result[j][0], result[j][1], 0);
+                                        unorderFunc->myPoints.push_back({ result[j][0],result[j][1],0 });
+                                    }
+                                    else if (i == 150)
+                                    {
+                                        std::wprintf(L"점 (%f,%f,%f)를 함수에 넣었다.\n", result[j][0], result[j][1], 0);
+                                        orderFunc->myPoints.push_back({ result[j][0],result[j][1],0 });
+                                    }
+                                }
+                            }
+
+                            delete tgtGyroid;
+
+                            size_t firstTimestepPos = str.find("ITEM: TIMESTEP");
+                            size_t secondTimestepPos = str.find("ITEM: TIMESTEP", firstTimestepPos + 1);
+                            if (secondTimestepPos == std::string::npos) break;
+                            else str = str.substr(secondTimestepPos);
+                            
+                            i++;
+                        }
+                    }
+                    else std::wprintf(L"파일을 읽는데 실패하였습니다.\n");
+                }
+                }
             else std::wprintf(L"잘못된 값이 입력되었다.\n");
         }
 

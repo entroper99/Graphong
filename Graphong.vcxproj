@@ -106,15 +106,15 @@
       <ConformanceMode>true</ConformanceMode>
       <LanguageStandard>stdcpplatest</LanguageStandard>
       <LanguageStandard_C>stdc17</LanguageStandard_C>
-      <AdditionalIncludeDirectories>C:\SDL\SDL2-2.0.14\include;C:\SDL\SDL2_image-2.0.5\include;C:\SDL\SDL2_mixer-2.0.4\include;C:\SDL\SDL2_ttf-2.0.15\include;C:\lib\glew\include\GL;C:\lib\eigen-3.4.0\eigen-3.4.0;C:\lib\glew\include;C:\lib\fftw-3.3.5-dll64;C:\OpenXLSX-0.3.2\OpenXLSX;C:\Program Files\PCL 1.14.1\include\pcl-1.14</AdditionalIncludeDirectories>
+      <AdditionalIncludeDirectories>C:\SDL\SDL2-2.0.14\include;C:\SDL\SDL2_image-2.0.5\include;C:\SDL\SDL2_mixer-2.0.4\include;C:\SDL\SDL2_ttf-2.0.15\include;C:\lib\glew\include\GL;C:\lib\eigen-3.4.0\eigen-3.4.0;C:\lib\glew\include;C:\lib\fftw-3.3.5-dll64;C:\OpenXLSX-0.3.2\OpenXLSX</AdditionalIncludeDirectories>
       <EnableModules>true</EnableModules>
       <BuildStlModules>true</BuildStlModules>
     </ClCompile>
     <Link>
       <SubSystem>Console</SubSystem>
       <GenerateDebugInformation>true</GenerateDebugInformation>
-      <AdditionalLibraryDirectories>C:\SDL\SDL2-2.0.14\lib\x64;C:\SDL\SDL2_image-2.0.5\lib\x64;C:\SDL\SDL2_ttf-2.0.15\lib\x64;C:\SDL\SDL2_mixer-2.0.4\lib\x64;C:\lib\glew\lib\Debug\x64;C:\lib\fftw-3.3.5-dll64;C:\OpenXLSX-0.3.2\build\output\Debug;C:\Program Files\PCL 1.14.1\lib</AdditionalLibraryDirectories>
-      <AdditionalDependencies>SDL2.lib;SDL2main.lib;SDL2test.lib;SDL2_image.lib;SDL2_mixer.lib;SDL2_ttf.lib;glew32d.lib;glew32sd.lib;opengl32.lib;glu32.lib;libfftw3l-3.lib;libfftw3-3.lib;libfftw3f-3.lib;OpenXLSXd.lib;pcl_common.lib;pcl_commond.lib;pcl_features.lib;pcl_featuresd.lib;pcl_filters.lib;pcl_filtersd.lib;pcl_io.lib;pcl_io_ply.lib;pcl_io_plyd.lib;pcl_kdtree.lib;pcl_kdtreed.lib;pcl_keypoints.lib;pcl_keypointsd.lib;pcl_ml.lib;pcl_mld.lib;pcl_octree.lib;pcl_octreed.lib;pcl_outofcore.lib;pcl_outofcored.lib;pcl_people.lib;pcl_peopled.lib;pcl_recognition.lib;pcl_recognitiond.lib;pcl_registration.lib;pcl_registrationd.lib;pcl_sample_consensus.lib;pcl_sample_consensusd.lib;pcl_search.lib;pcl_searchd.lib;pcl_segmentation.lib;pcl_segmentationd.lib;pcl_stereo.lib;pcl_stereod.lib;pcl_surface.lib;pcl_surfaced.lib;pcl_tracking.lib;pcl_trackingd.lib;pcl_visualization.lib;pcl_visualizationd.lib;%(AdditionalDependencies)</AdditionalDependencies>
+      <AdditionalLibraryDirectories>C:\SDL\SDL2-2.0.14\lib\x64;C:\SDL\SDL2_image-2.0.5\lib\x64;C:\SDL\SDL2_ttf-2.0.15\lib\x64;C:\SDL\SDL2_mixer-2.0.4\lib\x64;C:\lib\glew\lib\Debug\x64;C:\lib\fftw-3.3.5-dll64;C:\OpenXLSX-0.3.2\build\output\Debug</AdditionalLibraryDirectories>
+      <AdditionalDependencies>SDL2.lib;SDL2main.lib;SDL2test.lib;SDL2_image.lib;SDL2_mixer.lib;SDL2_ttf.lib;glew32d.lib;glew32sd.lib;opengl32.lib;glu32.lib;libfftw3l-3.lib;libfftw3-3.lib;libfftw3f-3.lib;OpenXLSXd.lib;%(AdditionalDependencies)</AdditionalDependencies>
     </Link>
   </ItemDefinitionGroup>
   <ItemDefinitionGroup Condition="'$(Configuration)|$(Platform)'=='Release|x64'">
@@ -143,12 +143,12 @@
     <ClCompile Include="inputCol.ixx" />
     <ClCompile Include="main.cpp" />
     <ClCompile Include="nanoTimer.ixx" />
+    <ClCompile Include="randomRange.ixx" />
     <ClCompile Include="stdevCurvature.ixx" />
     <ClCompile Include="ThreadPool.ixx" />
     <ClCompile Include="utilFile.ixx" />
     <ClCompile Include="utilMath.ixx" />
     <ClCompile Include="rainbow.ixx" />
-    <ClCompile Include="randomRange.ixx" />
     <ClCompile Include="read.ixx" />
     <ClCompile Include="Shapes.ixx" />
   </ItemGroup>

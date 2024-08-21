@@ -655,36 +655,29 @@ int main(int argc, char** argv)
             }
             else if (input == 23) //자이로이드 생성
             {
-                Func* targetFunc = new Func(funcFlag::scalarField);
-                int numPoints = 40; // 공간에 존재하는 점의 수, 많을수록 정확해짐
-                double spacing = (2.0 * M_PI) / numPoints; //사이의 공간, 전부 더하면 부피가 됨
-                double length = 1.0;
+                Func* refGyroid = new Func(funcFlag::scalarField);
+                double length = BOX_SIZE / 2.0;
                 double scaleFactor = 2.0 * M_PI / length;
-                targetFunc->scalarFunc = [=](double x, double y, double z)->double
+                refGyroid->scalarFunc = [=](double x, double y, double z)->double
                     {
                         return (std::cos(scaleFactor * x) * std::sin(scaleFactor * y) * std::sin(2 * (scaleFactor * z)) + std::cos(scaleFactor * y) * std::sin(scaleFactor * z) * std::sin(2 * (scaleFactor * x)) + std::cos(scaleFactor * z) * std::sin(scaleFactor * x) * std::sin(2 * (scaleFactor * y)));
                     };
+                refGyroid->latticeConstant = BOX_SIZE;// / 2.0;
+                refGyroid->scalarInfimum = -1.0;// * std::sqrt(2);
+                refGyroid->scalarSupremum = 1.0;// *std::sqrt(2);
 
-                targetFunc->scalarInfimum = -1.0;// * std::sqrt(2);
-                targetFunc->scalarSupremum = 1.0;// *std::sqrt(2);
-
-                for (double i = -0.5; i <= 0.5; i += 0.05)
+                for (double x = -BOX_SIZE/2.0; x <= BOX_SIZE / 2.0; x += 0.78)
                 {
-                    for (double j = -0.5; j <= 0.5; j += 0.05)
+                    for (double y = -BOX_SIZE / 2.0; y <= BOX_SIZE / 2.0; y += 0.78)
                     {
-                        for (double k = -0.5; k <= 0.5; k += 0.05)
+                        for (double z = -BOX_SIZE / 2.0; z <= BOX_SIZE / 2.0; z += 0.78)
                         {
-                            double x = i;
-                            double y = j;
-                            double z = k;
-                            double cutoff = 1.0; //이 값 이상의 자이로이드만 화면에 표시됨
-                            targetFunc->myPoints.push_back({ x, y, z });
-                            //std::wprintf(L"데이터 {%f,%f,%f}를 함수 %d에 입력했다.\n", x, y, z, funcSet.size() - 1);
+                            if (refGyroid->scalarFunc(x,y,z) >= 0.8) refGyroid->myPoints.push_back({ x, y, z });
                         }
                     }
                 }
-
-                targetFunc->scalarCalc();
+                std::wprintf(L"만족하는 자이로이드 점의 숫자는 %d개이다.\n", refGyroid->myPoints.size());
+                refGyroid->scalarCalc();
             }
             else if (input == 24)
             {
@@ -1583,12 +1576,22 @@ int main(int argc, char** argv)
                         Func* unorderFunc = new Func(funcFlag::scalarField);
                         unorderFunc->funcType = funcFlag::dim2;
                         unorderFunc->funcName = L"무질서";
-                        unorderFunc->myColor = rainbow(0.2);
+                        unorderFunc->myColor = col::white;
 
                         Func* orderFunc = new Func(funcFlag::scalarField);
                         orderFunc->funcType = funcFlag::dim2;
                         orderFunc->funcName = L"자이로이드";
-                        orderFunc->myColor = { 0xff,0xff,0xff };
+                        orderFunc->myColor = rainbow(0.4);
+
+                        Func* orderFunc2 = new Func(funcFlag::scalarField);
+                        orderFunc2->funcType = funcFlag::dim2;
+                        orderFunc2->funcName = L"자이로이드2";
+                        orderFunc2->myColor = rainbow(0.8);
+
+                        Func* orderFunc3 = new Func(funcFlag::scalarField);
+                        orderFunc3->funcType = funcFlag::dim2;
+                        orderFunc3->funcName = L"자이로이드3";
+                        orderFunc3->myColor = rainbow(0.2);
 
                         int i = 0;
                         while (1)
@@ -1602,8 +1605,8 @@ int main(int argc, char** argv)
                                 {
                                     return (std::cos(scaleFactor * x) * std::sin(scaleFactor * y) * std::sin(2 * (scaleFactor * z)) + std::cos(scaleFactor * y) * std::sin(scaleFactor * z) * std::sin(2 * (scaleFactor * x)) + std::cos(scaleFactor * z) * std::sin(scaleFactor * x) * std::sin(2 * (scaleFactor * y)));
                                 };
-                            tgtGyroid->translation(-BOX_SIZE / 2.0, -BOX_SIZE / 2.0, -BOX_SIZE / 2.0);
                             tgtGyroid->latticeConstant = BOX_SIZE;// / 2.0;
+                            tgtGyroid->translation(-BOX_SIZE / 2.0, -BOX_SIZE / 2.0, -BOX_SIZE / 2.0);
                             tgtGyroid->scalarCalc();
                             double originF = tgtGyroid->scalarSquareAvg();
 
@@ -1634,24 +1637,21 @@ int main(int argc, char** argv)
                             Eigen::Matrix3d inputRot = rotZ * rotY * rotX;
                             tgtGyroid->latticeRotation(tgtGyroid->myPoints, tgtGyroid->latticeConstant, inputRot); //랜덤 회전
 
-                            if (i == 0 || i == 150)
+                            if (i == 0 || i == 150 || i == 200 || i == 230)
                             {
                                 std::wprintf(L"TIME %d : 랜덤 평행이동 : (%f,%f,%f), 랜덤 회전 : (%f,%f,%f)\n", i, inputVec[0], inputVec[1], inputVec[2], xAngle, yAngle, zAngle);
                                 std::vector<std::array<double, 3>> tgtPoints;
                                 for (int i = 0; i < tgtGyroid->myPoints.size(); i++) tgtPoints.push_back({ tgtGyroid->myPoints[i].x,tgtGyroid->myPoints[i].y,tgtGyroid->myPoints[i].z });
                                 std::vector<std::array<double, 3>> result = calcLaplacianHistogram(tgtPoints, tgtGyroid->latticeConstant);
+                                std::wprintf(L"계산된 w값은 %f이다.\n", calcLaplacianWasserstein(tgtPoints, tgtGyroid->latticeConstant));
                                 for (int j = 0; j < result.size(); j++)
                                 {
-                                    if (i == 0)
-                                    {
-                                        std::wprintf(L"점 (%f,%f,%f)를 함수에 넣었다.\n", result[j][0], result[j][1], 0);
-                                        unorderFunc->myPoints.push_back({ result[j][0],result[j][1],0 });
-                                    }
-                                    else if (i == 150)
-                                    {
-                                        std::wprintf(L"점 (%f,%f,%f)를 함수에 넣었다.\n", result[j][0], result[j][1], 0);
-                                        orderFunc->myPoints.push_back({ result[j][0],result[j][1],0 });
-                                    }
+                                    //std::wprintf(L"ref.push_back({ %f,%f,0 });\n", result[j][0], result[j][1]);
+                                    //std::wprintf(L"점 (%f,%f,%f)를 함수에 넣었다.\n", result[j][0], result[j][1], 0);
+                                    if (i == 0) unorderFunc->myPoints.push_back({ result[j][0],result[j][1],0 });
+                                    else if (i == 150) orderFunc->myPoints.push_back({ result[j][0],result[j][1],0 });
+                                    else if (i == 200) orderFunc2->myPoints.push_back({ result[j][0],result[j][1],0 });
+                                    else if (i == 230) orderFunc3->myPoints.push_back({ result[j][0],result[j][1],0 });
                                 }
                             }
 

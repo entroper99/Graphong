@@ -1581,23 +1581,57 @@ int main(int argc, char** argv)
                         Func* orderFunc = new Func(funcFlag::scalarField);
                         orderFunc->funcType = funcFlag::dim2;
                         orderFunc->funcName = L"자이로이드";
-                        orderFunc->myColor = rainbow(0.4);
+                        orderFunc->myColor = rainbow(0.2);
 
                         Func* orderFunc2 = new Func(funcFlag::scalarField);
                         orderFunc2->funcType = funcFlag::dim2;
                         orderFunc2->funcName = L"자이로이드2";
-                        orderFunc2->myColor = rainbow(0.8);
+                        orderFunc2->myColor = rainbow(0.3);
 
                         Func* orderFunc3 = new Func(funcFlag::scalarField);
                         orderFunc3->funcType = funcFlag::dim2;
                         orderFunc3->funcName = L"자이로이드3";
-                        orderFunc3->myColor = rainbow(0.2);
+                        orderFunc3->myColor = rainbow(0.4);
 
-                        int i = 0;
+                        Func* refGyroid = new Func(funcFlag::scalarField);
+                        refGyroid->funcType = funcFlag::dim2;
+                        refGyroid->funcName = L"자이로이드(해석)";
+                        refGyroid->myColor = rainbow(0.6);
+
+
+                        int i = -1;
                         while (1)
                         {
+                            if (i == -1)
+                            {
+                                Func* refGyroid = new Func(funcFlag::scalarField);
+                                refGyroid->funcType = funcFlag::dim2;
+                                refGyroid->funcName = L"자이로이드(해석)";
+                                refGyroid->myColor = rainbow(0.6);
+                                double length = BOX_SIZE / 2.0;
+                                double scaleFactor = 2.0 * M_PI / length;
+                                refGyroid->scalarFunc = [=](double x, double y, double z)->double
+                                    {
+                                        return (std::cos(scaleFactor * x) * std::sin(scaleFactor * y) * std::sin(2 * (scaleFactor * z)) + std::cos(scaleFactor * y) * std::sin(scaleFactor * z) * std::sin(2 * (scaleFactor * x)) + std::cos(scaleFactor * z) * std::sin(scaleFactor * x) * std::sin(2 * (scaleFactor * y)));
+                                    };
+                                refGyroid->latticeConstant = BOX_SIZE;// / 2.0;
+                                for (double x = -BOX_SIZE / 2.0; x <= BOX_SIZE / 2.0; x += 0.78)
+                                {
+                                    for (double y = -BOX_SIZE / 2.0; y <= BOX_SIZE / 2.0; y += 0.78)
+                                    {
+                                        for (double z = -BOX_SIZE / 2.0; z <= BOX_SIZE / 2.0; z += 0.78)
+                                        {
+                                            if (refGyroid->scalarFunc(x, y, z) >= 0.8) refGyroid->myPoints.push_back({ x, y, z });
+                                        }
+                                    }
+                                }
+                                std::wprintf(L"만족하는 자이로이드 점의 숫자는 %d개이다.\n", refGyroid->myPoints.size());
+                                refGyroid->scalarCalc();
+                                refGyroid->translation(BOX_SIZE / 2.0, BOX_SIZE / 2.0, BOX_SIZE / 2.0);
+                            }
+                            else readTrjString(str, 9, -1, 2, 3, 4, 1, atomType);
 
-                            readTrjString(str, 9, -1, 2, 3, 4, 1, atomType);
+                            
                             Func* tgtGyroid = ((Func*)funcSet[funcSet.size() - 1]);
                             double length = BOX_SIZE / 2.0;
                             double scaleFactor = 2.0 * M_PI / length;
@@ -1637,7 +1671,7 @@ int main(int argc, char** argv)
                             Eigen::Matrix3d inputRot = rotZ * rotY * rotX;
                             tgtGyroid->latticeRotation(tgtGyroid->myPoints, tgtGyroid->latticeConstant, inputRot); //랜덤 회전
 
-                            if (i == 0 || i == 150 || i == 200 || i == 230)
+                            if (i == 0 || i == 150 || i == 200 || i == 230 ||i==-1)
                             {
                                 std::wprintf(L"TIME %d : 랜덤 평행이동 : (%f,%f,%f), 랜덤 회전 : (%f,%f,%f)\n", i, inputVec[0], inputVec[1], inputVec[2], xAngle, yAngle, zAngle);
                                 std::vector<std::array<double, 3>> tgtPoints;
@@ -1652,6 +1686,7 @@ int main(int argc, char** argv)
                                     else if (i == 150) orderFunc->myPoints.push_back({ result[j][0],result[j][1],0 });
                                     else if (i == 200) orderFunc2->myPoints.push_back({ result[j][0],result[j][1],0 });
                                     else if (i == 230) orderFunc3->myPoints.push_back({ result[j][0],result[j][1],0 });
+                                    else if ( i == -1) refGyroid->myPoints.push_back({ result[j][0],result[j][1],0 });
                                 }
                             }
 

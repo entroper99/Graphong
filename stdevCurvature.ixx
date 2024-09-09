@@ -14,8 +14,8 @@ double calcGaussian(double dx, double dy, double dz, double sigma, double amplit
 
 export void createDensityFunction(const std::vector<std::array<double, 3>>& inputPoints, double inputBoxSize, double*** density)
 {
-    double gaussAmp = 1.0;
-    double gaussSig = 0.68;
+    double gaussAmp = 0.4;
+    double gaussSig = 1;
     double del = inputBoxSize / (RESOLUTION - 1);
     int totalSize = RESOLUTION * RESOLUTION * RESOLUTION;
     int numThreads = std::thread::hardware_concurrency();
@@ -238,7 +238,7 @@ export std::vector<std::array<double, 3>> calcLaplacianHistogram(const std::vect
     }
     delete[] laplacian;
 
-    return createHistogramSize(laplacianDataset, 200);
+    return createHistogramSize(laplacianDataset, 512);
 }
 
 //array data -> 0:x값, 1:분포A, 2:분포B

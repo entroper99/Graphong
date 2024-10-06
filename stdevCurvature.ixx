@@ -150,7 +150,7 @@ export std::vector<std::array<double,3>> createHistogramDel(const std::vector<do
     int numBins = std::ceil((maxVal - minVal) / del); //구간의 숫자
 
     newPoints.resize(numBins);
-    for (int i = 0; i < numBins; i++) newPoints[i] = { minVal + i * del,0.0,0.0 };
+    for (int i = 0; i < numBins; i++) newPoints[i] = { (double)i,0.0,0.0 };
 
     for (int i = 0; i < inputDataset.size(); i++)
     {
@@ -238,7 +238,7 @@ export std::vector<std::array<double, 3>> calcLaplacianHistogram(const std::vect
     }
     delete[] laplacian;
 
-    return createHistogramSize(laplacianDataset, 512);
+    return createHistogramSize(laplacianDataset, 256);
 }
 
 //array data -> 0:x값, 1:분포A, 2:분포B

@@ -1729,11 +1729,43 @@ int main(int argc, char** argv)
                 std::cin >> cutoff;
 
 
+
+                std::vector<Point> pts = ((Func*)funcSet[dataIndex])->myPoints;
+
+                delete funcSet[dataIndex];
+                funcSet.pop_back();
+
                 Func* coordFunc = new Func(funcFlag::dim2);
                 coordFunc->funcName = L"COORDINATION ";
                 coordFunc->funcName += std::to_wstring(cutoff);
-                coordFunc->myColor = rainbow(0);
+                coordFunc->myColor = rainbow(randomRangeFloat(0.0,0.7));
 
+                std::array<int, 1000> coords = { 0, };
+                for (int i = 0; i < pts.size(); i++)
+                {
+                    double originDist = std::sqrt(std::pow(pts[i].x, 2) + std::pow(pts[i].y, 2) + std::pow(pts[i].z, 2));
+                    if (originDist < 4.0)
+                    {
+                        int number = 0;
+
+                        for (int j = 0; j < pts.size(); j++)
+                        {
+                            if (i != j)
+                            {
+                                double dist = std::sqrt(std::pow(pts[i].x - pts[j].x, 2) + std::pow(pts[i].y - pts[j].y, 2) + std::pow(pts[i].z - pts[j].z, 2));
+                                if (dist < cutoff) number++;
+                            }
+                        }
+                        coords[number] += 1;
+                    }
+                }
+
+                for (int i = 0; i < coords.size(); i++)
+                {
+                    coordFunc->myPoints.push_back({ (double)i,(double)coords[i],0 });
+                }
+
+                std::wprintf(L"COORDINATION을 성공적으로 구했다.\n");
             }
 
 

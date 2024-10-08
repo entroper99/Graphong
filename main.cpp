@@ -177,6 +177,7 @@ int main(int argc, char** argv)
             std::wprintf(L"\033[0;33m45. 결정구조 곡률 히스토그램 출력\033[0m\n");
             std::wprintf(L"\033[0;33m45. 결정구조 레퍼런스 히스토그램 출력\033[0m\n");
             std::wprintf(L"\033[0;33m46. 결정구조 COORDINATION 출력\033[0m\n");
+            std::wprintf(L"\033[0;33m47. 결정구조 밀도함수 변환 및 면적 계산\033[0m\n");
             std::wprintf(L"------------------▼아래에 값 입력-----------------\n");
 
             int input = 0;
@@ -1527,13 +1528,15 @@ int main(int argc, char** argv)
                 std::vector<std::array<double, 3>> dPts;
                 for (int i = 0; i < pts.size(); i++) dPts.push_back({pts[i].x,pts[i].y,pts[i].z});
 
+                double period = ((Func*)funcSet[dataIndex])->latticeConstant;
                 double*** density = create3DArray(RESOLUTION, RESOLUTION, RESOLUTION);
-                createDensityFunction(dPts, ((Func*)funcSet[dataIndex])->latticeConstant, density,RESOLUTION);
+                createDensityFunction(dPts, period, density,RESOLUTION);
 
                 ((Func*)funcSet[dataIndex])->funcType = funcFlag::dim3;
                 ((Func*)funcSet[dataIndex])->myColor = col::white;
 
                 ((Func*)funcSet[dataIndex])->myPoints.clear();
+                int pointNumber = 0;
                 for (int x = 0; x < RESOLUTION; x++)
                 {
                     for (int y = 0; y < RESOLUTION; y++)
@@ -1542,11 +1545,13 @@ int main(int argc, char** argv)
                         {
                             if (density[x][y][z] > cutoff - tolerance && density[x][y][z] < cutoff + tolerance)
                             {
-                                ((Func*)funcSet[dataIndex])->myPoints.push_back({ (double)x,(double)y,(double)z });
+                                ((Func*)funcSet[dataIndex])->myPoints.push_back({ (double)x - (double)RESOLUTION/2.0,(double)y - (double)RESOLUTION / 2.0,(double)z - (double)RESOLUTION / 2.0 });
+                                pointNumber++;
                             }
                         }
                     }
                 }
+                std::wprintf(L"%d/%d의 점들이 입력되었다.\n",pointNumber,RESOLUTION* RESOLUTION* RESOLUTION);
 
             }
 

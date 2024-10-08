@@ -1,41 +1,159 @@
+#define _USE_MATH_DEFINES
 #include <array>
 #include <vector>
 #include <thread>
 #include <mutex>
 #include <cmath>
+#include <iostream>
 
 export module stdevCurvature;
 
-const int RESOLUTION = 128;
-double calcGaussian(double dx, double dy, double dz, double sigma, double amplitude)
+export const int RESOLUTION = 128;
+export const int HIST_SIZE = 256;
+
+export double*** create3DArray(int x, int y, int z)
+{
+    double*** array3D = new double** [x];
+    for (int i = 0; i < x; i++)
+    {
+        array3D[i] = new double* [y];
+        for (int j = 0; j < y; j++)
+        {
+            array3D[i][j] = new double[z];
+            for (int k = 0; k < z; k++) array3D[i][j][k] = 0.0;
+        }
+    }
+    return array3D;
+}
+export double*** copy3DArray(double*** source, int x, int y, int z)
+{
+    double*** copy = new double** [x];
+    for (int i = 0; i < x; i++)
+    {
+        copy[i] = new double* [y];
+        for (int j = 0; j < y; j++)
+        {
+            copy[i][j] = new double[z];
+            for (int k = 0; k < z; k++) copy[i][j][k] = source[i][j][k];
+        }
+    }
+    return copy;
+}
+export void free3DArray(double*** array, int x, int y)
+{
+    for (int i = 0; i < x; i++)
+    {
+        for (int j = 0; j < y; j++)
+        {
+            delete[] array[i][j];
+        }
+        delete[] array[i];
+    }
+    delete[] array;
+}
+export double loss3DArray(double*** arr1, double*** arr2, int arrSize)
+{
+    double totalLoss = 0;
+    for (int x = 0; x < arrSize; x++)
+    {
+        for (int y = 0; y < arrSize; y++)
+        {
+            for (int z = 0; z < arrSize; z++)
+            {
+                totalLoss += fabs(arr1[x][y][z] - arr2[x][y][z]) * sqrt(x * x + y * y + z * z);
+            }
+        }
+    }
+    return totalLoss / (arrSize * arrSize * arrSize);
+}
+
+
+export std::vector<std::array<double, 3>> createHistogramDel(const std::vector<double>& inputDataset, double del)
+{
+
+    //xy데이터로 히스토그램을 만듭니다
+    std::vector<std::array<double, 3>> newPoints;
+
+    double minVal = *std::min_element(inputDataset.begin(), inputDataset.end());
+    double maxVal = *std::max_element(inputDataset.begin(), inputDataset.end());
+    int numBins = std::ceil((maxVal - minVal) / del); //구간의 숫자
+
+    //std::printf("numBins : %d\n", numBins);
+
+    newPoints.resize(numBins);
+    for (int i = 0; i < numBins; i++)
+    {
+        newPoints[i] = { (double)i,0.0,0.0 };
+    }
+
+    for (size_t i = 0; i < inputDataset.size(); i++)
+    {
+        int binIndex = (int)((inputDataset[i] - minVal) / del);
+        if (binIndex == numBins) binIndex--;
+
+        if (binIndex < numBins && binIndex >= 0)
+        {
+            newPoints[binIndex][1] += 1;
+        }
+    }
+
+    //std::printf("Histogram data (index, count, placeholder):\n");
+    //for (const auto& point : newPoints) std::printf("Bin: %.2f, Count: %.2f, Placeholder: %.2f\n", point[0], point[1], point[2]);
+
+    return newPoints;
+}
+export std::vector<std::array<double, 3>> createHistogramSize(const std::vector<double>& inputDataset, int inputSize)
+{
+    double minVal = *std::min_element(inputDataset.begin(), inputDataset.end());
+    double maxVal = *std::max_element(inputDataset.begin(), inputDataset.end());
+    double del = (maxVal - minVal) / (double)inputSize;
+    return createHistogramDel(inputDataset, del);
+}
+export double calcGaussian(double dx, double dy, double dz, double sigma, double amplitude)
 {
     return amplitude * std::exp(-(dx * dx + dy * dy + dz * dz) / (2 * sigma * sigma));
 }
-
-export void createDensityFunction(const std::vector<std::array<double, 3>>& inputPoints, double inputBoxSize, double*** density)
+export double calcGaussian2(double dx, double dy, double dz, const double& invSig, double amplitude)
 {
-    double gaussAmp = 0.4;
-    double gaussSig = 1;
-    double del = inputBoxSize / (RESOLUTION - 1);
-    int totalSize = RESOLUTION * RESOLUTION * RESOLUTION;
+    double distanceSq = dx * dx + dy * dy + dz * dz;
+    return amplitude * std::exp(-distanceSq * invSig);
+}
+export void createDensityFunction(const std::vector<std::array<double, 3>>& inputPoints, double inputBoxSize, double*** density, const int& resolution)
+{
+    //std::printf("RESOL : %d, pointsSize : %d, inputBoxSize : %f\n", RESOLUTION, inputPoints.size(), inputBoxSize);
+    const double SIG = 0.68;
+    const double SIG2 = SIG * SIG;
+    const double INV_SIG = 1.0 / (2.0 * SIG2);
+
+    double gaussAmp = 1.0;
+    double del = inputBoxSize / (resolution - 1);
+    int totalSize = resolution * resolution * resolution;
     int numThreads = std::thread::hardware_concurrency();
+    //std::printf("cpu number : %d\n", numThreads);
     int blockSize = totalSize / numThreads;
 
-    auto calculateDensityPart = [&density, &inputPoints, inputBoxSize, del, gaussSig, gaussAmp](int startIdx, int endIdx)
+    auto calculateDensityPart = [&density, &inputPoints, inputBoxSize, del, INV_SIG, gaussAmp, resolution](int startIdx, int endIdx)
         {
+
+            //for (const auto& point : inputPoints)std::printf("inputPoints : %f,%f,%f\n", point[0],point[1],point[2]);
+
             for (int i = startIdx; i < endIdx; ++i)
             {
-                int xIdx = i / (RESOLUTION * RESOLUTION);
-                int yIdx = (i / RESOLUTION) % RESOLUTION;
-                int zIdx = i % RESOLUTION;
+                int xIdx = i / (resolution * resolution);
+                int yIdx = (i / resolution) % resolution;
+                int zIdx = i % resolution;
 
                 double tgtX = xIdx * del - inputBoxSize / 2.0;
                 double tgtY = yIdx * del - inputBoxSize / 2.0;
                 double tgtZ = zIdx * del - inputBoxSize / 2.0;
 
+
+                //if (getStep() != 0) std::printf("(%d,%d,%d) -> (%f,%f,%f)\n", xIdx, yIdx, zIdx, tgtX, tgtY, tgtZ);
+
                 double densityValue = 0;
-                for (const auto& point : inputPoints) densityValue += calcGaussian(point[0] - tgtX, point[1] - tgtY, point[2] - tgtZ, gaussSig, gaussAmp);
+                for (const auto& point : inputPoints) densityValue += calcGaussian2(point[0] - tgtX, point[1] - tgtY, point[2] - tgtZ, INV_SIG, gaussAmp);
                 density[xIdx][yIdx][zIdx] = densityValue;
+                //std::printf("density input : %f\n", densityValue);
             }
         };
 
@@ -49,22 +167,173 @@ export void createDensityFunction(const std::vector<std::array<double, 3>>& inpu
     for (auto& thread : threads)  thread.join();
 }
 
-export double calcStdevCurvature(const std::vector<std::array<double, 3>>& inputPoints, double inputBoxSize)
+export double wassersteinDist(const std::vector<std::array<double, 3>>& data)
 {
-    double*** density = new double** [RESOLUTION];
-    for (int i = 0; i < RESOLUTION; i++)
+    int size = data.size();
+    std::vector<double> aCDF(size);
+    std::vector<double> bCDF(size);
+
+
+    aCDF[0] = data[0][1];
+    bCDF[0] = data[0][2];
+    for (int i = 1; i < size; i++)
     {
-        density[i] = new double* [RESOLUTION];
-        for (int j = 0; j < RESOLUTION; j++)
+        aCDF[i] = aCDF[i - 1] + data[i][1];
+        bCDF[i] = bCDF[i - 1] + data[i][2];
+    }
+
+
+    for (int i = 0; i < size; i++)
+    {
+        aCDF[i] /= aCDF[size - 1];
+        bCDF[i] /= bCDF[size - 1];
+    }
+
+
+    double wDist = 0;
+    for (int i = 0; i < size - 1; i++)
+    {
+        double diff = std::abs(bCDF[i] - aCDF[i]);
+        double interval = data[i + 1][0] - data[i][0];
+        wDist += diff * interval;
+
+    }
+
+
+    //exit(-1);
+    return wDist;
+}
+
+//export double wassersteinDist(const std::vector<std::array<double, 3>>& data)
+//{
+//    int size = data.size();
+//    std::vector<double> aCDF(size);
+//    std::vector<double> bCDF(size);
+//    aCDF[0] = data[0][1];
+//    bCDF[0] = data[0][2];
+//    for (int i = 1; i < size; i++)
+//    {
+//        aCDF[i] = aCDF[i - 1] + data[i][1];
+//        bCDF[i] = bCDF[i - 1] + data[i][2];
+//    }
+//    double wVar = 0;
+//    for (int i = 0; i < size - 1; i++)
+//    {
+//        wVar += std::abs(bCDF[i] - aCDF[i]) * (data[i + 1][0] - data[i][0]);
+//    }
+//    return wVar;
+//}
+export double JSDivergence(const std::vector<std::array<double, 3>>& data)
+{
+    int size = data.size();
+    double aSum = 0, bSum = 0;
+    for (int i = 0; i < size; i++)
+    {
+        aSum += data[i][1];
+        bSum += data[i][2];
+    }
+
+    if (aSum == 0 || bSum == 0)
+    {
+        std::cerr << "[Error] One of the distributions sums to zero." << std::endl;
+        std::exit(EXIT_FAILURE);
+    }
+
+    std::vector<double> normA(size);
+    std::vector<double> normB(size);
+
+    for (int i = 0; i < size; i++)
+    {
+        normA[i] = data[i][1] / aSum;
+        normB[i] = data[i][2] / bSum;
+    }
+
+    std::vector<double> mData(size);
+    for (int i = 0; i < size; i++)
+    {
+        mData[i] = 0.5 * (normA[i] + normB[i]);
+    }
+
+    double aKL = 0;
+    for (int i = 0; i < size; i++)
+    {
+        if (normA[i] > 0)
         {
-            density[i][j] = new double[RESOLUTION];
-            for (int k = 0; k < RESOLUTION; k++) density[i][j][k] = 0.0;
+            aKL += normA[i] * std::log(normA[i] / mData[i]);
         }
     }
-    createDensityFunction(inputPoints, inputBoxSize, density);
 
+    double bKL = 0;
+    for (int i = 0; i < size; i++)
+    {
+        if (normB[i] > 0)
+        {
+            bKL += normB[i] * std::log(normB[i] / mData[i]);
+        }
+    }
+
+    return 0.5 * (aKL + bKL);
+}
+
+export std::vector<std::array<double, 3>> makeGyroidPoints(double boxSize)
+{
+    std::vector<std::array<double, 3>> gyroidPoints;
+
+    double length = boxSize;// / 2.0;
+    double scaleFactor = 2.0 * M_PI / length;
+    auto gyroidFunc = [=](double x, double y, double z)->double
+        {
+            return (std::cos(scaleFactor * x) * std::sin(scaleFactor * y) * std::sin(2 * (scaleFactor * z)) + std::cos(scaleFactor * y) * std::sin(scaleFactor * z) * std::sin(2 * (scaleFactor * x)) + std::cos(scaleFactor * z) * std::sin(scaleFactor * x) * std::sin(2 * (scaleFactor * y)));
+        };
+
+    const double del = 0.2;//0.78
+    for (double x = -boxSize / 2.0; x <= boxSize / 2.0; x += del)
+    {
+        for (double y = -boxSize / 2.0; y <= boxSize / 2.0; y += del)
+        {
+            for (double z = -boxSize / 2.0; z <= boxSize / 2.0; z += del)
+            {
+                if (gyroidFunc(x, y, z) >= 0.8) gyroidPoints.push_back({ x, y, z });
+            }
+        }
+    }
+    return gyroidPoints;
+}
+export std::vector<std::array<double, 3>> makeGyroidLaplacianSet(double boxSize)
+{
+    double*** density = create3DArray(RESOLUTION, RESOLUTION, RESOLUTION);
+    createDensityFunction(makeGyroidPoints(boxSize), boxSize, density, RESOLUTION);
+
+    double*** laplacian = create3DArray(RESOLUTION - 2, RESOLUTION - 2, RESOLUTION - 2);
+    double del = boxSize / (RESOLUTION - 1);
+    double delSquared = del * del;
+    std::vector<double> laplacianSet;
+    for (int x = 1; x < RESOLUTION - 1; x++)
+    {
+        for (int y = 1; y < RESOLUTION - 1; y++)
+        {
+            for (int z = 1; z < RESOLUTION - 1; z++)
+            {
+                laplacian[x - 1][y - 1][z - 1] = 0;
+                laplacian[x - 1][y - 1][z - 1] += (density[x + 1][y][z] - 2 * density[x][y][z] + density[x - 1][y][z]);
+                laplacian[x - 1][y - 1][z - 1] += (density[x][y + 1][z] - 2 * density[x][y][z] + density[x][y - 1][z]);
+                laplacian[x - 1][y - 1][z - 1] += (density[x][y][z + 1] - 2 * density[x][y][z] + density[x][y][z - 1]);
+                laplacian[x - 1][y - 1][z - 1] /= delSquared;
+
+                laplacianSet.push_back(laplacian[x - 1][y - 1][z - 1]);
+            }
+        }
+    }
+
+    free3DArray(density, RESOLUTION, RESOLUTION);
+    free3DArray(laplacian, RESOLUTION - 2, RESOLUTION - 2);
+
+    return createHistogramSize(laplacianSet, HIST_SIZE);
+}
+export double densityToStdev(double*** density, double boxSize) //밀도함수를 입력받아 라플라시안을 반환
+{
     double*** laplacian = new double** [RESOLUTION - 2];
-    for (int i = 0; i < RESOLUTION-2; i++)
+    for (int i = 0; i < RESOLUTION - 2; i++)
     {
         laplacian[i] = new double* [RESOLUTION - 2];
         for (int j = 0; j < RESOLUTION - 2; j++)
@@ -73,7 +342,8 @@ export double calcStdevCurvature(const std::vector<std::array<double, 3>>& input
             for (int k = 0; k < RESOLUTION - 2; k++) laplacian[i][j][k] = 0.0;
         }
     }
-    double del = inputBoxSize / (RESOLUTION - 1);
+
+    double del = boxSize / (RESOLUTION - 1);
     double delSquared = del * del;
     for (int x = 1; x < RESOLUTION - 1; x++)
     {
@@ -114,17 +384,7 @@ export double calcStdevCurvature(const std::vector<std::array<double, 3>>& input
         }
     }
     variance /= (double)((RESOLUTION - 2) * (RESOLUTION - 2) * (RESOLUTION - 2));
-    double stdev = std::sqrt(variance);
 
-    for (int i = 0; i < RESOLUTION; i++)
-    {
-        for (int j = 0; j < RESOLUTION; j++)
-        {
-            delete[] density[i][j];
-        }
-        delete[] density[i];
-    }
-    delete[] density;
 
     for (int i = 0; i < RESOLUTION - 2; i++)
     {
@@ -136,70 +396,14 @@ export double calcStdevCurvature(const std::vector<std::array<double, 3>>& input
     }
     delete[] laplacian;
 
-    return stdev;
+    return std::sqrt(variance);
 }
-
-
-export std::vector<std::array<double,3>> createHistogramDel(const std::vector<double>& inputDataset, double del)
+export double densityToHist(double*** density, double boxSize, const std::vector<std::array<double, 3>>& refHist)
 {
-    //xy데이터로 히스토그램을 만듭니다
-    std::vector<std::array<double, 3>> newPoints;
-
-    double minVal = *std::min_element(inputDataset.begin(), inputDataset.end());
-    double maxVal = *std::max_element(inputDataset.begin(), inputDataset.end());
-    int numBins = std::ceil((maxVal - minVal) / del); //구간의 숫자
-
-    newPoints.resize(numBins);
-    for (int i = 0; i < numBins; i++) newPoints[i] = { (double)i,0.0,0.0 };
-
-    for (int i = 0; i < inputDataset.size(); i++)
-    {
-        int binIndex = (int)((inputDataset[i] - minVal) / del);
-        if (binIndex == numBins) binIndex--;
-
-        if (binIndex < numBins && binIndex >= 0)
-        {
-            newPoints[binIndex][1] += 1;
-        }
-    }
-    return newPoints;
-}
-
-export std::vector<std::array<double, 3>> createHistogramSize(const std::vector<double>& inputDataset, int inputSize)
-{
-    double minVal = *std::min_element(inputDataset.begin(), inputDataset.end());
-    double maxVal = *std::max_element(inputDataset.begin(), inputDataset.end());
-    double del = (maxVal - minVal) / (double)inputSize;
-    return createHistogramDel(inputDataset, del);
-}
-
-export std::vector<std::array<double, 3>> calcLaplacianHistogram(const std::vector<std::array<double, 3>>& inputPoints, double inputBoxSize)
-{
-    double*** density = new double** [RESOLUTION];
-    for (int i = 0; i < RESOLUTION; i++)
-    {
-        density[i] = new double* [RESOLUTION];
-        for (int j = 0; j < RESOLUTION; j++)
-        {
-            density[i][j] = new double[RESOLUTION];
-            for (int k = 0; k < RESOLUTION; k++) density[i][j][k] = 0.0;
-        }
-    }
-    createDensityFunction(inputPoints, inputBoxSize, density);
-
-    double*** laplacian = new double** [RESOLUTION - 2];
-    for (int i = 0; i < RESOLUTION - 2; i++)
-    {
-        laplacian[i] = new double* [RESOLUTION - 2];
-        for (int j = 0; j < RESOLUTION - 2; j++)
-        {
-            laplacian[i][j] = new double[RESOLUTION - 2];
-            for (int k = 0; k < RESOLUTION - 2; k++) laplacian[i][j][k] = 0.0;
-        }
-    }
-    std::vector<double> laplacianDataset;
-    double del = inputBoxSize / (RESOLUTION - 1);
+    double*** laplacian = create3DArray(RESOLUTION - 2, RESOLUTION - 2, RESOLUTION - 2);
+    double del = boxSize / (RESOLUTION - 1);
     double delSquared = del * del;
+    std::vector<double> laplacianSet;
     for (int x = 1; x < RESOLUTION - 1; x++)
     {
         for (int y = 1; y < RESOLUTION - 1; y++)
@@ -211,338 +415,27 @@ export std::vector<std::array<double, 3>> calcLaplacianHistogram(const std::vect
                 laplacian[x - 1][y - 1][z - 1] += (density[x][y + 1][z] - 2 * density[x][y][z] + density[x][y - 1][z]);
                 laplacian[x - 1][y - 1][z - 1] += (density[x][y][z + 1] - 2 * density[x][y][z] + density[x][y][z - 1]);
                 laplacian[x - 1][y - 1][z - 1] /= delSquared;
+                laplacianSet.push_back(laplacian[x - 1][y - 1][z - 1]);
 
-                laplacianDataset.push_back(laplacian[x - 1][y - 1][z - 1]);
+                //if (getStep() != 0) printf("laplSet : %f\n", laplacianSet[laplacianSet.size() - 1]);
             }
         }
     }
 
+    std::vector<std::array<double, 3>> lapHist = createHistogramSize(laplacianSet, HIST_SIZE);
+    std::vector<std::array<double, 3>> finalSet;
 
-    for (int i = 0; i < RESOLUTION; i++)
-    {
-        for (int j = 0; j < RESOLUTION; j++)
-        {
-            delete[] density[i][j];
-        }
-        delete[] density[i];
-    }
-    delete[] density;
-
-    for (int i = 0; i < RESOLUTION - 2; i++)
-    {
-        for (int j = 0; j < RESOLUTION - 2; j++)
-        {
-            delete[] laplacian[i][j];
-        }
-        delete[] laplacian[i];
-    }
-    delete[] laplacian;
-
-    return createHistogramSize(laplacianDataset, 256);
-}
-
-//array data -> 0:x값, 1:분포A, 2:분포B
-double wassersteinDist(const std::vector<std::array<double,3>>& data)
-{
-    int size = data.size();
-    std::vector<double> aCDF(size);
-    std::vector<double> bCDF(size);
-
-    aCDF[0] = data[0][1];
-    bCDF[0] = data[0][2];
-
-    for (int i = 1; i < size; i++)
-    {
-        aCDF[i] = aCDF[i - 1] + data[i][1];
-        bCDF[i] = bCDF[i - 1] + data[i][2];
-    }
-
-    double wVar = 0;
-    for (int i = 0; i < size - 1; i++)
-    {
-        wVar += std::abs(bCDF[i] - aCDF[i]) * (data[i + 1][0] - data[i][0]);
-    }
-    return wVar;
-}
+    for (int i = 0; i < 256; i++) finalSet.push_back({ lapHist[i][0],lapHist[i][1], refHist[i][1] });
 
 
+    //std::printf("FinalSet data (lapHist[0], lapHist[1], refHist[1]):\n");
+    //for (size_t i = 0; i < finalSet.size(); i++)
+    //{
+    //    std::printf("Bin: %.2f, LapHistCount: %.2f, RefHistCount: %.2f\n",
+    //        finalSet[i][0], finalSet[i][1], finalSet[i][2]);
+    //}
 
-export double calcLaplacianWasserstein(const std::vector<std::array<double, 3>>& inputPoints, double inputBoxSize)
-{
-    double*** density = new double** [RESOLUTION];
-    for (int i = 0; i < RESOLUTION; i++)
-    {
-        density[i] = new double* [RESOLUTION];
-        for (int j = 0; j < RESOLUTION; j++)
-        {
-            density[i][j] = new double[RESOLUTION];
-            for (int k = 0; k < RESOLUTION; k++) density[i][j][k] = 0.0;
-        }
-    }
-    createDensityFunction(inputPoints, inputBoxSize, density);
-
-    double*** laplacian = new double** [RESOLUTION - 2];
-    for (int i = 0; i < RESOLUTION - 2; i++)
-    {
-        laplacian[i] = new double* [RESOLUTION - 2];
-        for (int j = 0; j < RESOLUTION - 2; j++)
-        {
-            laplacian[i][j] = new double[RESOLUTION - 2];
-            for (int k = 0; k < RESOLUTION - 2; k++) laplacian[i][j][k] = 0.0;
-        }
-    }
-    std::vector<double> laplacianDataset;
-    double del = inputBoxSize / (RESOLUTION - 1);
-    double delSquared = del * del;
-    for (int x = 1; x < RESOLUTION - 1; x++)
-    {
-        for (int y = 1; y < RESOLUTION - 1; y++)
-        {
-            for (int z = 1; z < RESOLUTION - 1; z++)
-            {
-                laplacian[x - 1][y - 1][z - 1] = 0;
-                laplacian[x - 1][y - 1][z - 1] += (density[x + 1][y][z] - 2 * density[x][y][z] + density[x - 1][y][z]);
-                laplacian[x - 1][y - 1][z - 1] += (density[x][y + 1][z] - 2 * density[x][y][z] + density[x][y - 1][z]);
-                laplacian[x - 1][y - 1][z - 1] += (density[x][y][z + 1] - 2 * density[x][y][z] + density[x][y][z - 1]);
-                laplacian[x - 1][y - 1][z - 1] /= delSquared;
-
-                laplacianDataset.push_back(laplacian[x - 1][y - 1][z - 1]);
-            }
-        }
-    }
-
-    std::vector<std::array<double, 3>> target = createHistogramSize(laplacianDataset, 200);
-    
-    std::vector<std::array<double, 3>> ref;
-    ref.push_back({ -14.378373,3.000000,0 });
-    ref.push_back({ -14.279998,7.000000,0 });
-    ref.push_back({ -14.181624,9.000000,0 });
-    ref.push_back({ -14.083250,7.000000,0 });
-    ref.push_back({ -13.984875,9.000000,0 });
-    ref.push_back({ -13.886501,13.000000,0 });
-    ref.push_back({ -13.788127,8.000000,0 });
-    ref.push_back({ -13.689752,21.000000,0 });
-    ref.push_back({ -13.591378,8.000000,0 });
-    ref.push_back({ -13.493004,14.000000,0 });
-    ref.push_back({ -13.394630,17.000000,0 });
-    ref.push_back({ -13.296255,13.000000,0 });
-    ref.push_back({ -13.197881,27.000000,0 });
-    ref.push_back({ -13.099507,30.000000,0 });
-    ref.push_back({ -13.001132,39.000000,0 });
-    ref.push_back({ -12.902758,44.000000,0 });
-    ref.push_back({ -12.804384,68.000000,0 });
-    ref.push_back({ -12.706009,55.000000,0 });
-    ref.push_back({ -12.607635,77.000000,0 });
-    ref.push_back({ -12.509261,92.000000,0 });
-    ref.push_back({ -12.410886,89.000000,0 });
-    ref.push_back({ -12.312512,123.000000,0 });
-    ref.push_back({ -12.214138,105.000000,0 });
-    ref.push_back({ -12.115764,113.000000,0 });
-    ref.push_back({ -12.017389,158.000000,0 });
-    ref.push_back({ -11.919015,180.000000,0 });
-    ref.push_back({ -11.820641,181.000000,0 });
-    ref.push_back({ -11.722266,220.000000,0 });
-    ref.push_back({ -11.623892,228.000000,0 });
-    ref.push_back({ -11.525518,282.000000,0 });
-    ref.push_back({ -11.427143,303.000000,0 });
-    ref.push_back({ -11.328769,324.000000,0 });
-    ref.push_back({ -11.230395,350.000000,0 });
-    ref.push_back({ -11.132021,363.000000,0 });
-    ref.push_back({ -11.033646,445.000000,0 });
-    ref.push_back({ -10.935272,471.000000,0 });
-    ref.push_back({ -10.836898,482.000000,0 });
-    ref.push_back({ -10.738523,571.000000,0 });
-    ref.push_back({ -10.640149,588.000000,0 });
-    ref.push_back({ -10.541775,663.000000,0 });
-    ref.push_back({ -10.443400,711.000000,0 });
-    ref.push_back({ -10.345026,729.000000,0 });
-    ref.push_back({ -10.246652,777.000000,0 });
-    ref.push_back({ -10.148277,946.000000,0 });
-    ref.push_back({ -10.049903,1027.000000,0 });
-    ref.push_back({ -9.951529,1111.000000,0 });
-    ref.push_back({ -9.853155,1214.000000,0 });
-    ref.push_back({ -9.754780,1317.000000,0 });
-    ref.push_back({ -9.656406,1420.000000,0 });
-    ref.push_back({ -9.558032,1544.000000,0 });
-    ref.push_back({ -9.459657,1751.000000,0 });
-    ref.push_back({ -9.361283,1816.000000,0 });
-    ref.push_back({ -9.262909,2004.000000,0 });
-    ref.push_back({ -9.164534,2080.000000,0 });
-    ref.push_back({ -9.066160,2221.000000,0 });
-    ref.push_back({ -8.967786,2468.000000,0 });
-    ref.push_back({ -8.869412,2591.000000,0 });
-    ref.push_back({ -8.771037,2719.000000,0 });
-    ref.push_back({ -8.672663,2827.000000,0 });
-    ref.push_back({ -8.574289,3059.000000,0 });
-    ref.push_back({ -8.475914,3176.000000,0 });
-    ref.push_back({ -8.377540,3349.000000,0 });
-    ref.push_back({ -8.279166,3575.000000,0 });
-    ref.push_back({ -8.180791,3723.000000,0 });
-    ref.push_back({ -8.082417,3876.000000,0 });
-    ref.push_back({ -7.984043,4118.000000,0 });
-    ref.push_back({ -7.885668,4197.000000,0 });
-    ref.push_back({ -7.787294,4558.000000,0 });
-    ref.push_back({ -7.688920,4661.000000,0 });
-    ref.push_back({ -7.590546,4927.000000,0 });
-    ref.push_back({ -7.492171,5030.000000,0 });
-    ref.push_back({ -7.393797,5212.000000,0 });
-    ref.push_back({ -7.295423,5548.000000,0 });
-    ref.push_back({ -7.197048,5649.000000,0 });
-    ref.push_back({ -7.098674,5755.000000,0 });
-    ref.push_back({ -7.000300,5885.000000,0 });
-    ref.push_back({ -6.901925,6201.000000,0 });
-    ref.push_back({ -6.803551,6339.000000,0 });
-    ref.push_back({ -6.705177,6399.000000,0 });
-    ref.push_back({ -6.606803,6723.000000,0 });
-    ref.push_back({ -6.508428,6821.000000,0 });
-    ref.push_back({ -6.410054,7157.000000,0 });
-    ref.push_back({ -6.311680,7204.000000,0 });
-    ref.push_back({ -6.213305,7383.000000,0 });
-    ref.push_back({ -6.114931,7568.000000,0 });
-    ref.push_back({ -6.016557,7645.000000,0 });
-    ref.push_back({ -5.918182,7906.000000,0 });
-    ref.push_back({ -5.819808,8134.000000,0 });
-    ref.push_back({ -5.721434,8115.000000,0 });
-    ref.push_back({ -5.623059,8252.000000,0 });
-    ref.push_back({ -5.524685,8204.000000,0 });
-    ref.push_back({ -5.426311,8658.000000,0 });
-    ref.push_back({ -5.327937,8567.000000,0 });
-    ref.push_back({ -5.229562,8866.000000,0 });
-    ref.push_back({ -5.131188,8814.000000,0 });
-    ref.push_back({ -5.032814,9064.000000,0 });
-    ref.push_back({ -4.934439,9227.000000,0 });
-    ref.push_back({ -4.836065,9317.000000,0 });
-    ref.push_back({ -4.737691,9357.000000,0 });
-    ref.push_back({ -4.639316,9500.000000,0 });
-    ref.push_back({ -4.540942,9718.000000,0 });
-    ref.push_back({ -4.442568,9651.000000,0 });
-    ref.push_back({ -4.344194,9947.000000,0 });
-    ref.push_back({ -4.245819,9894.000000,0 });
-    ref.push_back({ -4.147445,10073.000000,0 });
-    ref.push_back({ -4.049071,10079.000000,0 });
-    ref.push_back({ -3.950696,10386.000000,0 });
-    ref.push_back({ -3.852322,10380.000000,0 });
-    ref.push_back({ -3.753948,10695.000000,0 });
-    ref.push_back({ -3.655573,10614.000000,0 });
-    ref.push_back({ -3.557199,10557.000000,0 });
-    ref.push_back({ -3.458825,10798.000000,0 });
-    ref.push_back({ -3.360450,10944.000000,0 });
-    ref.push_back({ -3.262076,10725.000000,0 });
-    ref.push_back({ -3.163702,11298.000000,0 });
-    ref.push_back({ -3.065328,11421.000000,0 });
-    ref.push_back({ -2.966953,11459.000000,0 });
-    ref.push_back({ -2.868579,11536.000000,0 });
-    ref.push_back({ -2.770205,11553.000000,0 });
-    ref.push_back({ -2.671830,11888.000000,0 });
-    ref.push_back({ -2.573456,11846.000000,0 });
-    ref.push_back({ -2.475082,11924.000000,0 });
-    ref.push_back({ -2.376707,12138.000000,0 });
-    ref.push_back({ -2.278333,12332.000000,0 });
-    ref.push_back({ -2.179959,12319.000000,0 });
-    ref.push_back({ -2.081585,12496.000000,0 });
-    ref.push_back({ -1.983210,12654.000000,0 });
-    ref.push_back({ -1.884836,12931.000000,0 });
-    ref.push_back({ -1.786462,13159.000000,0 });
-    ref.push_back({ -1.688087,13250.000000,0 });
-    ref.push_back({ -1.589713,13259.000000,0 });
-    ref.push_back({ -1.491339,13591.000000,0 });
-    ref.push_back({ -1.392964,13561.000000,0 });
-    ref.push_back({ -1.294590,13917.000000,0 });
-    ref.push_back({ -1.196216,14253.000000,0 });
-    ref.push_back({ -1.097841,14063.000000,0 });
-    ref.push_back({ -0.999467,14493.000000,0 });
-    ref.push_back({ -0.901093,14788.000000,0 });
-    ref.push_back({ -0.802719,14838.000000,0 });
-    ref.push_back({ -0.704344,15271.000000,0 });
-    ref.push_back({ -0.605970,15731.000000,0 });
-    ref.push_back({ -0.507596,15933.000000,0 });
-    ref.push_back({ -0.409221,16165.000000,0 });
-    ref.push_back({ -0.310847,16283.000000,0 });
-    ref.push_back({ -0.212473,16897.000000,0 });
-    ref.push_back({ -0.114098,17054.000000,0 });
-    ref.push_back({ -0.015724,17454.000000,0 });
-    ref.push_back({ 0.082650,18024.000000,0 });
-    ref.push_back({ 0.181024,18373.000000,0 });
-    ref.push_back({ 0.279399,19109.000000,0 });
-    ref.push_back({ 0.377773,19888.000000,0 });
-    ref.push_back({ 0.476147,20545.000000,0 });
-    ref.push_back({ 0.574522,21895.000000,0 });
-    ref.push_back({ 0.672896,22926.000000,0 });
-    ref.push_back({ 0.771270,23799.000000,0 });
-    ref.push_back({ 0.869645,25128.000000,0 });
-    ref.push_back({ 0.968019,27209.000000,0 });
-    ref.push_back({ 1.066393,28222.000000,0 });
-    ref.push_back({ 1.164768,29263.000000,0 });
-    ref.push_back({ 1.263142,30842.000000,0 });
-    ref.push_back({ 1.361516,31893.000000,0 });
-    ref.push_back({ 1.459890,33171.000000,0 });
-    ref.push_back({ 1.558265,34014.000000,0 });
-    ref.push_back({ 1.656639,34460.000000,0 });
-    ref.push_back({ 1.755013,34611.000000,0 });
-    ref.push_back({ 1.853388,34785.000000,0 });
-    ref.push_back({ 1.951762,34898.000000,0 });
-    ref.push_back({ 2.050136,34970.000000,0 });
-    ref.push_back({ 2.148511,34985.000000,0 });
-    ref.push_back({ 2.246885,33881.000000,0 });
-    ref.push_back({ 2.345259,32655.000000,0 });
-    ref.push_back({ 2.443633,31180.000000,0 });
-    ref.push_back({ 2.542008,30176.000000,0 });
-    ref.push_back({ 2.640382,29444.000000,0 });
-    ref.push_back({ 2.738756,28602.000000,0 });
-    ref.push_back({ 2.837131,27164.000000,0 });
-    ref.push_back({ 2.935505,25789.000000,0 });
-    ref.push_back({ 3.033879,24645.000000,0 });
-    ref.push_back({ 3.132254,23698.000000,0 });
-    ref.push_back({ 3.230628,22816.000000,0 });
-    ref.push_back({ 3.329002,21899.000000,0 });
-    ref.push_back({ 3.427377,21113.000000,0 });
-    ref.push_back({ 3.525751,19958.000000,0 });
-    ref.push_back({ 3.624125,18868.000000,0 });
-    ref.push_back({ 3.722499,17071.000000,0 });
-    ref.push_back({ 3.820874,15237.000000,0 });
-    ref.push_back({ 3.919248,13722.000000,0 });
-    ref.push_back({ 4.017622,11878.000000,0 });
-    ref.push_back({ 4.115997,9594.000000,0 });
-    ref.push_back({ 4.214371,7698.000000,0 });
-    ref.push_back({ 4.312745,5819.000000,0 });
-    ref.push_back({ 4.411120,4187.000000,0 });
-    ref.push_back({ 4.509494,2810.000000,0 });
-    ref.push_back({ 4.607868,1960.000000,0 });
-    ref.push_back({ 4.706242,1264.000000,0 });
-    ref.push_back({ 4.804617,881.000000,0 });
-    ref.push_back({ 4.902991,636.000000,0 });
-    ref.push_back({ 5.001365,442.000000,0 });
-    ref.push_back({ 5.099740,230.000000,0 });
-    ref.push_back({ 5.198114,41.000000,0 });
-    std::wprintf(L"ref의 사이즈는 %d이고 target의 사이즈는 %d이다.\n",ref.size(), target.size());
-
-    if (ref.size() != target.size())
-    {
-        exit(-1);
-    }
-
-    std::vector<std::array<double, 3>> wInput;
-    for (int i = 0; i < target.size(); i++) wInput.push_back({ target[i][0],target[i][1],ref[i][1] });
-    
-    for (int i = 0; i < RESOLUTION; i++)
-    {
-        for (int j = 0; j < RESOLUTION; j++)
-        {
-            delete[] density[i][j];
-        }
-        delete[] density[i];
-    }
-    delete[] density;
-
-    for (int i = 0; i < RESOLUTION - 2; i++)
-    {
-        for (int j = 0; j < RESOLUTION - 2; j++)
-        {
-            delete[] laplacian[i][j];
-        }
-        delete[] laplacian[i];
-    }
-    delete[] laplacian;
-
-    return wassersteinDist(wInput);
+    free3DArray(laplacian, RESOLUTION - 2, RESOLUTION - 2);
+    double result = wassersteinDist(finalSet);
+    return result;
 }

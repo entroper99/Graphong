@@ -11,6 +11,11 @@
 #include <iostream>
 #include <fftw3.h>
 
+#include "array3D.hpp"
+#include "densityField.hpp"
+#include "histogram.hpp"
+#include "probDist.hpp"
+
 import std;
 import globalVar;
 import constVar;
@@ -23,7 +28,6 @@ import Func;
 import utilMath;
 import utilFile;
 import randomRange;
-import stdevCurvature;
 
 void prtFuncName()
 {
@@ -1524,34 +1528,38 @@ int main(int argc, char** argv)
                 std::wprintf(L"허용오차 값을 몇으로 할까?.\n");
                 std::cin >> tolerance;
 
+                int resolution = 32;
+                std::wprintf(L"해상도를 몇으로 할까?\n");
+                std::cin >> resolution;
+
                 std::vector<Point> pts = ((Func*)funcSet[dataIndex])->myPoints;
                 std::vector<std::array<double, 3>> dPts;
                 for (int i = 0; i < pts.size(); i++) dPts.push_back({pts[i].x,pts[i].y,pts[i].z});
 
                 double period = ((Func*)funcSet[dataIndex])->latticeConstant;
-                double*** density = create3DArray(RESOLUTION, RESOLUTION, RESOLUTION);
-                createDensityFunction(dPts, period, density,RESOLUTION);
+                double*** density = create3DArray(resolution, resolution, resolution);
+                createDensityFunction(dPts, period, density,resolution);
 
                 ((Func*)funcSet[dataIndex])->funcType = funcFlag::dim3;
                 ((Func*)funcSet[dataIndex])->myColor = col::white;
 
                 ((Func*)funcSet[dataIndex])->myPoints.clear();
                 int pointNumber = 0;
-                for (int x = 0; x < RESOLUTION; x++)
+                for (int x = 0; x < resolution; x++)
                 {
-                    for (int y = 0; y < RESOLUTION; y++)
+                    for (int y = 0; y < resolution; y++)
                     {
-                        for (int z = 0; z < RESOLUTION; z++)
+                        for (int z = 0; z < resolution; z++)
                         {
                             if (density[x][y][z] > cutoff - tolerance && density[x][y][z] < cutoff + tolerance)
                             {
-                                ((Func*)funcSet[dataIndex])->myPoints.push_back({ (double)x - (double)RESOLUTION/2.0,(double)y - (double)RESOLUTION / 2.0,(double)z - (double)RESOLUTION / 2.0 });
+                                ((Func*)funcSet[dataIndex])->myPoints.push_back({ (double)x - (double)resolution/2.0,(double)y - (double)resolution / 2.0,(double)z - (double)resolution / 2.0 });
                                 pointNumber++;
                             }
                         }
                     }
                 }
-                std::wprintf(L"%d/%d의 점들이 입력되었다.\n",pointNumber,RESOLUTION* RESOLUTION* RESOLUTION);
+                std::wprintf(L"%d/%d의 점들이 입력되었다.\n",pointNumber,resolution* resolution* resolution);
 
             }
 

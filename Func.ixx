@@ -5,6 +5,8 @@
 #include <unsupported/Eigen/CXX11/Tensor>
 #include <fftw3.h>
 
+#include "densityField.hpp"
+
 export module Func;
 
 import std;
@@ -610,7 +612,7 @@ export struct Func
 
         Eigen::Tensor<double, 3> density(inputGridSize, inputGridSize, inputGridSize);
         density.setZero();
-        density = createDensityFunction(inputPoints, inputLatticeConstant, inputGridSize);
+        density = createDensityFunctionSelf(inputPoints, inputLatticeConstant, inputGridSize);
 
         Eigen::Tensor<double, 3> windowFunc = createBlackmanWindow(inputGridSize);
         density = density * windowFunc;
@@ -688,7 +690,7 @@ export struct Func
         return fourierResult;
     }
 
-    Eigen::Tensor<double, 3> createDensityFunction(const std::vector<Point>& inputPoints, double inputLatticeConstant, int inputGridSize)
+    Eigen::Tensor<double, 3> createDensityFunctionSelf(const std::vector<Point>& inputPoints, double inputLatticeConstant, int inputGridSize)
     {
         __int64 startTime = getNanoTimer();
 
@@ -748,7 +750,7 @@ export struct Func
         double delSquared = del * del;
         int gridSize = inputGridSize * inputGridSize * inputGridSize;
         Eigen::Tensor<double, 3> density(inputGridSize, inputGridSize, inputGridSize);
-        density = createDensityFunction(inputPoints, inputLatticeConstant, inputGridSize);
+        density = createDensityFunctionSelf(inputPoints, inputLatticeConstant, inputGridSize);
         Eigen::Tensor<double, 3> laplacian(inputGridSize-2, inputGridSize-2, inputGridSize-2);
         laplacian.setZero();
         for (int x = 1; x < inputGridSize - 1; x++)
@@ -849,7 +851,7 @@ export struct Func
         int gridSize = inputGridSize * inputGridSize * inputGridSize;
 
         Eigen::Tensor<double, 3> density(inputGridSize, inputGridSize, inputGridSize);
-        density = createDensityFunction(inputPoints, inputLatticeConstant, inputGridSize);
+        density = createDensityFunctionSelf(inputPoints, inputLatticeConstant, inputGridSize);
         Eigen::Tensor<double, 3> windowFunc = createBlackmanWindow(inputGridSize);
         density = density * windowFunc;
         std::wprintf(L"창함수를 곱하였다.\n");

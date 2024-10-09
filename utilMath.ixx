@@ -38,11 +38,6 @@ export void printRotationMatrix(Eigen::Matrix3d inputMat)
     std::cout << "z축 회전: " << z << "도" << std::endl;
 }
 
-export double calcGaussian(double dx, double dy, double dz, double sigma, double amplitude)
-{
-    return amplitude * exp(-(dx * dx + dy * dy + dz * dz) / (2 * sigma * sigma));
-}
-
 
 export Eigen::Matrix3d angleToMatrix(double xAngle, double yAngle, double zAngle)
 {

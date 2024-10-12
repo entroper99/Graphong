@@ -5,8 +5,6 @@
 #include <unsupported/Eigen/CXX11/Tensor>
 #include <fftw3.h>
 
-#include "densityField.hpp"
-
 export module Func;
 
 import std;
@@ -16,6 +14,7 @@ import Shapes;
 import utilMath;
 import nanoTimer;
 import ThreadPool;
+import exAddOn;
 
 std::mutex density_mutex;
 
@@ -66,6 +65,13 @@ export struct Func
     ~Func()
     {
         funcSet.erase(std::find(funcSet.begin(), funcSet.end(), this));
+    }
+
+    std::vector<std::array<double, 3>> getRawPoints()
+    {
+        std::vector<std::array<double, 3>> rtnPoints;
+        for (int i = 0; i < myPoints.size(); i++) rtnPoints.push_back({myPoints[i].x,myPoints[i].y,myPoints[i].z});
+        return rtnPoints;
     }
 
     void singleTriangulation()
@@ -803,6 +809,103 @@ export struct Func
                 for (int z = 0; z < inputGridSize - 2; z++)
                 {
                     kurtosis += std::pow((laplacian(x, y, z) - mean)/ stddev, 4.0);
+                }
+            }
+        }
+        kurtosis /= (double)laplacian.size();
+        kurtosis -= 3.0;
+        std::wprintf(L"[3/5] 첨도는 %f이다.\n", kurtosis);
+
+        double skewness = 0.0;
+        for (int x = 0; x < inputGridSize - 2; x++)
+        {
+            for (int y = 0; y < inputGridSize - 2; y++)
+            {
+                for (int z = 0; z < inputGridSize - 2; z++)
+                {
+                    skewness += std::pow((laplacian(x, y, z) - mean) / stddev, 3.0);
+                }
+            }
+        }
+        skewness /= (double)laplacian.size();
+        std::wprintf(L"[4/5] 왜도는 %f이다.\n", skewness);
+
+
+
+        int number = 0;
+        double cutoff = 4.2;
+        for (int x = 0; x < inputGridSize - 2; x++)
+        {
+            for (int y = 0; y < inputGridSize - 2; y++)
+            {
+                for (int z = 0; z < inputGridSize - 2; z++)
+                {
+                    if (laplacian(x, y, z) > cutoff) number++;
+                }
+            }
+        }
+        std::wprintf(L"[5/5] 컷오프 %f를 넘은 원자의 숫자는 %d개이다.\n", cutoff, number);
+
+
+        return { mean,variance,stddev,kurtosis,skewness,(double)number };
+    }
+
+    std::array<double, 6> getCurvData(double*** density, const int inputGridSize, const double inputBosSize)
+    {
+        double del = inputBosSize / (inputGridSize - 1);
+        double delSquared = del * del;
+        Eigen::Tensor<double, 3> laplacian(inputGridSize - 2, inputGridSize - 2, inputGridSize - 2);
+        laplacian.setZero();
+        for (int x = 1; x < inputGridSize - 1; x++)
+        {
+            for (int y = 1; y < inputGridSize - 1; y++)
+            {
+                for (int z = 1; z < inputGridSize - 1; z++)
+                {
+                    laplacian(x - 1, y - 1, z - 1) += (density[x + 1][y][z] - 2 * density[x][y][z] + density[x - 1][y][z]);
+                    laplacian(x - 1, y - 1, z - 1) += (density[x][y + 1][z] - 2 * density[x][y][z] + density[x][y - 1][z]);
+                    laplacian(x - 1, y - 1, z - 1) += (density[x][y][z + 1] - 2 * density[x][y][z] + density[x][y][z - 1]);
+                    laplacian(x - 1, y - 1, z - 1) /= delSquared;
+                }
+            }
+        }
+
+        double variance = 0.0;
+        double totalVal = 0.0;
+        for (int x = 0; x < inputGridSize - 2; x++)
+        {
+            for (int y = 0; y < inputGridSize - 2; y++)
+            {
+                for (int z = 0; z < inputGridSize - 2; z++)
+                {
+                    totalVal += laplacian(x, y, z);
+                }
+            }
+        }
+        double mean = totalVal / (double)laplacian.size();
+        for (int x = 0; x < inputGridSize - 2; x++)
+        {
+            for (int y = 0; y < inputGridSize - 2; y++)
+            {
+                for (int z = 0; z < inputGridSize - 2; z++)
+                {
+                    variance += std::pow(laplacian(x, y, z) - mean, 2.0);
+                }
+            }
+        }
+        variance /= (double)laplacian.size();
+        double stddev = std::sqrt(variance);
+        std::wprintf(L"[1/5] 분산은 %f이다.\n", variance);
+        std::wprintf(L"[2/5] 표준편차는 %f이다.\n", stddev);
+
+        double kurtosis = 0.0;
+        for (int x = 0; x < inputGridSize - 2; x++)
+        {
+            for (int y = 0; y < inputGridSize - 2; y++)
+            {
+                for (int z = 0; z < inputGridSize - 2; z++)
+                {
+                    kurtosis += std::pow((laplacian(x, y, z) - mean) / stddev, 4.0);
                 }
             }
         }

@@ -60,22 +60,8 @@
     <ClCompile Include="randomRange.ixx">
       <Filter>소스 파일</Filter>
     </ClCompile>
-    <ClCompile Include="densityField.hpp">
+    <ClCompile Include="exAddOn.ixx">
       <Filter>헤더 파일</Filter>
     </ClCompile>
-    <ClCompile Include="densityField.cpp">
-      <Filter>헤더 파일</Filter>
-    </ClCompile>
-  </ItemGroup>
-  <ItemGroup>
-    <ClInclude Include="array3D.hpp">
-      <Filter>헤더 파일</Filter>
-    </ClInclude>
-    <ClInclude Include="histogram.hpp">
-      <Filter>헤더 파일</Filter>
-    </ClInclude>
-    <ClInclude Include="probDist.hpp">
-      <Filter>헤더 파일</Filter>
-    </ClInclude>
   </ItemGroup>
 </Project>

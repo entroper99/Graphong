@@ -136,9 +136,8 @@
   <ItemGroup>
     <ClCompile Include="constVar.ixx" />
     <ClCompile Include="cubicSpline.ixx" />
-    <ClCompile Include="densityField.cpp" />
-    <ClCompile Include="densityField.hpp" />
     <ClCompile Include="drawer.ixx" />
+    <ClCompile Include="exAddOn.ixx" />
     <ClCompile Include="Func.ixx" />
     <ClCompile Include="globalVar.ixx" />
     <ClCompile Include="inputCol.ixx" />
@@ -151,11 +150,6 @@
     <ClCompile Include="rainbow.ixx" />
     <ClCompile Include="read.ixx" />
     <ClCompile Include="Shapes.ixx" />
-  </ItemGroup>
-  <ItemGroup>
-    <ClInclude Include="array3D.hpp" />
-    <ClInclude Include="histogram.hpp" />
-    <ClInclude Include="probDist.hpp" />
   </ItemGroup>
   <Import Project="$(VCTargetsPath)\Microsoft.Cpp.targets" />
   <ImportGroup Label="ExtensionTargets">

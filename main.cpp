@@ -1489,11 +1489,11 @@ int main(int argc, char** argv)
                         Func* orderFunc2 = new Func(funcFlag::scalarField);
                         orderFunc2->funcType = funcFlag::dim2;
                         orderFunc2->funcName = L"자이로이드2";
-                        orderFunc2->myColor = rainbow(0.3);
+                        orderFunc2->myColor = rainbow(0.4);
                         Func* orderFunc3 = new Func(funcFlag::scalarField);
                         orderFunc3->funcType = funcFlag::dim2;
                         orderFunc3->funcName = L"자이로이드3";
-                        orderFunc3->myColor = rainbow(0.4);
+                        orderFunc3->myColor = rainbow(0.6);
                         Func* refGyroid = new Func(funcFlag::scalarField);
                         refGyroid->funcType = funcFlag::dim2;
                         refGyroid->funcName = L"자이로이드(해석)";
@@ -1514,7 +1514,7 @@ int main(int argc, char** argv)
                                         return (std::cos(scaleFactor * x) * std::sin(scaleFactor * y) * std::sin(2 * (scaleFactor * z)) + std::cos(scaleFactor * y) * std::sin(scaleFactor * z) * std::sin(2 * (scaleFactor * x)) + std::cos(scaleFactor * z) * std::sin(scaleFactor * x) * std::sin(2 * (scaleFactor * y)));
                                     };
                                 refGyroid->latticeConstant = BOX_SIZE;// / 2.0;
-                                const double gDel = 0.6;
+                                const double gDel = 0.7;
                                 for (double x = -BOX_SIZE / 2.0; x <= BOX_SIZE / 2.0; x += gDel)
                                 {
                                     for (double y = -BOX_SIZE / 2.0; y <= BOX_SIZE / 2.0; y += gDel)
@@ -1577,7 +1577,7 @@ int main(int argc, char** argv)
                                 double*** density = create3DArray(resolution, resolution, resolution);
                                 createDensityFunction(tgtGyroid->getRawPoints(), BOX_SIZE,density, resolution);
                                 double*** laplacian = createLaplacian(density, resolution, BOX_SIZE);
-                                std::vector<std::array<double, 3>> result = arrayToHistogram(density, resolution, 256);
+                                std::vector<std::array<double, 3>> result = arrayToHistogram(density, resolution, 1024);
                                 //std::wprintf(L"계산된 w값은 %f이다.\n", calcLaplacianWasserstein(tgtPoints, tgtGyroid->latticeConstant));
                                 for (int j = 0; j < result.size(); j++)
                                 {

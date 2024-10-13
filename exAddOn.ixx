@@ -368,6 +368,63 @@ export std::vector<std::array<double,3>> arrayToHistogram(double*** array, const
     return createHistogramSize(linearData, histoSize);
 }
 
+
+export double arrayToMean(double*** array, const int& resolution)
+{
+    double totalVal = 0.0;
+    for (int x = 0; x < resolution; x++)
+    {
+        for (int y = 0; y < resolution; y++)
+        {
+            for (int z = 0; z < resolution; z++)
+            {
+                totalVal += array[x][y][z];
+            }
+        }
+    }
+    double mean = totalVal / (double)(resolution * resolution * resolution);
+    return mean;
+}
+
+export double arrayToStdev(double*** array, const int& resolution)
+{
+    double variance = 0.0;
+    double mean = arrayToMean(array, resolution);
+    for (int x = 0; x < resolution; x++)
+    {
+        for (int y = 0; y < resolution; y++)
+        {
+            for (int z = 0; z < resolution; z++)
+            {
+                variance += std::pow(array[x][y][z] - mean, 2.0);
+            }
+        }
+    }
+    variance /= (double)(resolution * resolution * resolution);
+    double stdev = std::sqrt(variance);
+    return stdev;
+}
+
+
+export double arrayToSkewness(double*** array, const int& resolution)
+{
+    double skewness = 0.0;
+    double stdev = arrayToStdev(array, resolution);
+    double mean = arrayToMean(array, resolution);
+    if (stdev == 0) std::wcerr << L"standard deviation is zero in arrayToSkewness.";
+    for (int x = 0; x < resolution; x++)
+    {
+        for (int y = 0; y < resolution; y++)
+        {
+            for (int z = 0; z < resolution; z++)
+            {
+                skewness += std::pow((array[x][y][z] - mean) / stdev, 3.0);
+            }
+        }
+    }
+    return skewness;
+}
+
 export double wassersteinDist(const std::vector<std::array<double, 3>>& data)
 {
     int size = data.size();

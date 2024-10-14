@@ -948,6 +948,88 @@ export struct Func
     }
 
 
+    std::array<double, 6> getDenseData(double*** density, const int inputGridSize, const double inputBosSize)
+    {
+        double del = inputBosSize / (inputGridSize - 1);
+        double delSquared = del * del;
+
+        double variance = 0.0;
+        double totalVal = 0.0;
+        for (int x = 0; x < inputGridSize; x++)
+        {
+            for (int y = 0; y < inputGridSize; y++)
+            {
+                for (int z = 0; z < inputGridSize; z++)
+                {
+                    totalVal += density[x][y][z];
+                }
+            }
+        }
+        double mean = totalVal / (inputGridSize* inputGridSize* inputGridSize);
+        for (int x = 0; x < inputGridSize; x++)
+        {
+            for (int y = 0; y < inputGridSize; y++)
+            {
+                for (int z = 0; z < inputGridSize; z++)
+                {
+                    variance += std::pow(density[x][y][z] - mean, 2.0);
+                }
+            }
+        }
+        variance /= (double)(inputGridSize * inputGridSize * inputGridSize);
+        double stddev = std::sqrt(variance);
+        std::wprintf(L"[1/5] 분산은 %f이다.\n", variance);
+        std::wprintf(L"[2/5] 표준편차는 %f이다.\n", stddev);
+
+        double kurtosis = 0.0;
+        for (int x = 0; x < inputGridSize; x++)
+        {
+            for (int y = 0; y < inputGridSize; y++)
+            {
+                for (int z = 0; z < inputGridSize; z++)
+                {
+                    kurtosis += std::pow((density[x][y][z] - mean) / stddev, 4.0);
+                }
+            }
+        }
+        kurtosis /= (double)(inputGridSize * inputGridSize * inputGridSize);
+        kurtosis -= 3.0;
+        std::wprintf(L"[3/5] 첨도는 %f이다.\n", kurtosis);
+
+        double skewness = 0.0;
+        for (int x = 0; x < inputGridSize; x++)
+        {
+            for (int y = 0; y < inputGridSize; y++)
+            {
+                for (int z = 0; z < inputGridSize; z++)
+                {
+                    skewness += std::pow((density[x][y][z] - mean) / stddev, 3.0);
+                }
+            }
+        }
+        skewness /= (double)(inputGridSize * inputGridSize * inputGridSize);
+        std::wprintf(L"[4/5] 왜도는 %f이다.\n", skewness);
+
+
+
+        int number = 0;
+        double cutoff = 2.5;
+        for (int x = 0; x < inputGridSize; x++)
+        {
+            for (int y = 0; y < inputGridSize; y++)
+            {
+                for (int z = 0; z < inputGridSize; z++)
+                {
+                    if (density[x][y][z] > cutoff) number++;
+                }
+            }
+        }
+        std::wprintf(L"[5/5] 컷오프 %f를 넘은 원자의 숫자는 %d개이다.\n", cutoff, number);
+
+
+        return { mean,variance,stddev,kurtosis,skewness,(double)number };
+    }
+
     Eigen::Tensor<std::complex<double>, 3> convertToDensityFuncAndFFT2(const std::vector<Point>& inputPoints, double inputLatticeConstant, int inputGridSize)
     {
         double del = inputLatticeConstant / (inputGridSize - 1);

@@ -1392,10 +1392,10 @@ int main(int argc, char** argv)
                         int i = 0;
                         while (1)
                         {
-                            const double BOX_SIZE = 10.73;
+                            const double BOX_SIZE = 4.9862;//10.73;
                             readTrjString(str, 9, -1, 2, 3, 4, 1, atomType);
                             Func* tgtGyroid = ((Func*)funcSet[funcSet.size() - 1]);
-                            double length = BOX_SIZE / 2.0;
+                            double length = BOX_SIZE;
                             double scaleFactor = 2.0 * M_PI / length;
                             tgtGyroid->scalarFunc = [=](double x, double y, double z)->double
                                 {
@@ -1439,6 +1439,7 @@ int main(int argc, char** argv)
                             double*** density = create3DArray(resol, resol, resol);
                             createDensityFunction(tgtGyroid->getRawPoints(), tgtGyroid->latticeConstant, density, resol);
                             std::array<double, 6> result = tgtGyroid->getCurvData(density, resol, tgtGyroid->latticeConstant);
+                            
                             timeGraphFunc->myPoints.push_back({ (double)i,result[0],0 });
                             timeGraphFunc2->myPoints.push_back({ (double)i,result[1],0 });
                             timeGraphFunc3->myPoints.push_back({ (double)i,result[2],0 });
@@ -1494,10 +1495,10 @@ int main(int argc, char** argv)
                         orderFunc3->funcType = funcFlag::dim2;
                         orderFunc3->funcName = L"자이로이드3";
                         orderFunc3->myColor = rainbow(0.6);
-                        Func* refGyroid = new Func(funcFlag::scalarField);
-                        refGyroid->funcType = funcFlag::dim2;
-                        refGyroid->funcName = L"자이로이드(해석)";
-                        refGyroid->myColor = rainbow(0);
+                        //Func* refGyroid = new Func(funcFlag::scalarField);
+                        //refGyroid->funcType = funcFlag::dim2;
+                        //refGyroid->funcName = L"자이로이드(해석)";
+                        //refGyroid->myColor = rainbow(0);
                         int i = -1;
                         while (1)
                         {
@@ -1569,7 +1570,7 @@ int main(int argc, char** argv)
                             //    Eigen::Matrix3d inputRot = rotZ * rotY * rotX;
                             //    tgtGyroid->latticeRotation(tgtGyroid->myPoints, tgtGyroid->latticeConstant, inputRot); //랜덤 회전
                             //}
-                            if (i == 0 || i == 17 || i == 27 || i == 37 || i == -1)
+                            if (i == 0 || i == 185 || i == 190 || i == 195 || i == -1)
                             {
                                 std::wprintf(L"TIME %d : 랜덤 평행이동 : (%f,%f,%f), 랜덤 회전 : (%f,%f,%f)\n", i, transVec[0], transVec[1], transVec[2], xAngle, yAngle, zAngle);
                                 std::vector<std::array<double, 3>> tgtPoints;
@@ -1577,18 +1578,22 @@ int main(int argc, char** argv)
                                 double*** density = create3DArray(resolution, resolution, resolution);
                                 createDensityFunction(tgtGyroid->getRawPoints(), BOX_SIZE,density, resolution);
                                 double*** laplacian = createLaplacian(density, resolution, BOX_SIZE);
-                                std::vector<std::array<double, 3>> result = arrayToHistogram(density, resolution, 1024);
+                                std::vector<std::array<double, 3>> result = arrayToHistogram(density, resolution, 128);
+                                std::wprintf(L"밀도의 평균은 %lf, 표준편차는 %lf, 왜도는 %lf이다.\n", arrayToMean(density,resolution), arrayToStdev(density, resolution), arrayToSkewness(density, resolution));
+
+
+
                                 //std::wprintf(L"계산된 w값은 %f이다.\n", calcLaplacianWasserstein(tgtPoints, tgtGyroid->latticeConstant));
                                 for (int j = 0; j < result.size(); j++)
                                 {
                                     //std::wprintf(L"점 (%f,%f,%f)를 함수에 넣었다.\n", result[j][0], result[j][1], 0);
                                     if (i == 0) unorderFunc->myPoints.push_back({ result[j][0],result[j][1],0 });
-                                    else if (i == 17) orderFunc->myPoints.push_back({ result[j][0],result[j][1],0 });
-                                    else if (i == 27) orderFunc2->myPoints.push_back({ result[j][0],result[j][1],0 });
-                                    else if (i == 37) orderFunc3->myPoints.push_back({ result[j][0],result[j][1],0 });
+                                    else if (i == 185) orderFunc->myPoints.push_back({ result[j][0],result[j][1],0 });
+                                    else if (i == 190) orderFunc2->myPoints.push_back({ result[j][0],result[j][1],0 });
+                                    else if (i == 195) orderFunc3->myPoints.push_back({ result[j][0],result[j][1],0 });
                                     else if (i == -1)
                                     {
-                                        refGyroid->myPoints.push_back({ result[j][0],result[j][1],0 });
+                                        //refGyroid->myPoints.push_back({ result[j][0],result[j][1],0 });
                                     }
                                 }
                             }

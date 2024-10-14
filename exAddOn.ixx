@@ -308,9 +308,6 @@ export double*** createLaplacian(double*** density, int resolution, double boxSi
     return laplacian;
 }
 
-
-
-
 export std::vector<std::array<double, 3>> createHistogramDel(const std::vector<double>& inputDataset, double del)
 {
     //xy데이터로 히스토그램을 만듭니다
@@ -318,14 +315,15 @@ export std::vector<std::array<double, 3>> createHistogramDel(const std::vector<d
 
     double minVal = *std::min_element(inputDataset.begin(), inputDataset.end());
     double maxVal = *std::max_element(inputDataset.begin(), inputDataset.end());
-    int numBins = std::ceil((maxVal - minVal) / del); //구간의 숫자
+    int numBins = std::ceil((maxVal - minVal) / del);
 
     //std::printf("numBins : %d\n", numBins);
 
     newPoints.resize(numBins);
     for (int i = 0; i < numBins; i++)
     {
-        newPoints[i] = { (double)i,0.0,0.0 };
+        //newPoints[i] = { (double)i,0.0,0.0 };
+        newPoints[i] = { (minVal + del*(double)i),0.0,0.0 };
     }
 
     for (size_t i = 0; i < inputDataset.size(); i++)
@@ -333,14 +331,9 @@ export std::vector<std::array<double, 3>> createHistogramDel(const std::vector<d
         int binIndex = (int)((inputDataset[i] - minVal) / del);
         if (binIndex == numBins) binIndex--;
 
-        if (binIndex < numBins && binIndex >= 0)
-        {
-            newPoints[binIndex][1] += 1;
-        }
+        if (binIndex < numBins && binIndex >= 0) newPoints[binIndex][1] += 1;
     }
 
-    //std::printf("Histogram data (index, count, placeholder):\n");
-    //for (const auto& point : newPoints) std::printf("Bin: %.2f, Count: %.2f, Placeholder: %.2f\n", point[0], point[1], point[2]);
 
     return newPoints;
 }

@@ -129,7 +129,6 @@ export double createDensityFunction(const std::vector<std::array<double, 3>>& in
     const double INV_SIG = 1.0 / (2.0 * SIG2);
 
     double gaussAmp = 1.0;
-    double del = inputBoxSize / (resolution - 1);
     int totalSize = resolution * resolution * resolution;
     int numThreads = std::thread::hardware_concurrency();
     //std::printf("cpu number : %d\n", numThreads);
@@ -138,7 +137,7 @@ export double createDensityFunction(const std::vector<std::array<double, 3>>& in
     double cutoff = 3.0 * SIG; //진폭의 99.7프로를 포함하는 값 
     double cutoffSq = cutoff * cutoff;
 
-    auto calculateDensityPart = [&density, &pbcPoints, inputBoxSize, del, SIG, INV_SIG, gaussAmp, cutoffSq, resolution](int startIdx, int endIdx)
+    auto calculateDensityPart = [&density, &pbcPoints, inputBoxSize, SIG, INV_SIG, gaussAmp, cutoffSq, resolution](int startIdx, int endIdx)
         {
             //for (const auto& point : pbcPoints)std::printf("pbcPoints : %f,%f,%f\n", point[0],point[1],point[2]);
             for (int i = startIdx; i < endIdx; ++i)
@@ -147,9 +146,12 @@ export double createDensityFunction(const std::vector<std::array<double, 3>>& in
                 int yIdx = (i / resolution) % resolution;
                 int zIdx = i % resolution;
 
-                double tgtX = xIdx * del - inputBoxSize / 2.0;
-                double tgtY = yIdx * del - inputBoxSize / 2.0;
-                double tgtZ = zIdx * del - inputBoxSize / 2.0;
+                //10의 박스사이즈 2면은 2.5 7.5
+                // (boxSize/resolution)/2.0
+
+                double tgtX = (inputBoxSize / resolution) / 2.0 + xIdx * (inputBoxSize / resolution) - inputBoxSize / 2.0;
+                double tgtY = (inputBoxSize / resolution) / 2.0 + yIdx * (inputBoxSize / resolution) - inputBoxSize / 2.0;
+                double tgtZ = (inputBoxSize / resolution) / 2.0 + zIdx * (inputBoxSize / resolution) - inputBoxSize / 2.0;
 
                 //if (getStep() != 0) std::printf("(%d,%d,%d) -> (%f,%f,%f)\n", xIdx, yIdx, zIdx, tgtX, tgtY, tgtZ);
                 double densityValue = 0;
@@ -195,7 +197,6 @@ export double createDensityFunction(const std::vector<std::array<double, 3>>& in
     double meanVal = totalVal / (double)(resolution * resolution * resolution);
     //std::wprintf(L"밀도 함수의 평균값은 %lf이다.\n", totalVal / (double)(resolution * resolution * resolution));
     return meanVal;
-
 }
 
 export double densityToStdev(double*** density, double boxSize, const int resol)

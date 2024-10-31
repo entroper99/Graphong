@@ -101,20 +101,21 @@
   <ItemDefinitionGroup Condition="'$(Configuration)|$(Platform)'=='Debug|x64'">
     <ClCompile>
       <WarningLevel>Level3</WarningLevel>
-      <SDLCheck>true</SDLCheck>
-      <PreprocessorDefinitions>_DEBUG;_CONSOLE;%(PreprocessorDefinitions)</PreprocessorDefinitions>
+      <SDLCheck>false</SDLCheck>
+      <PreprocessorDefinitions>_DEBUG;_CONSOLE;NOMINMAX;%(PreprocessorDefinitions)</PreprocessorDefinitions>
       <ConformanceMode>true</ConformanceMode>
       <LanguageStandard>stdcpplatest</LanguageStandard>
       <LanguageStandard_C>stdc17</LanguageStandard_C>
-      <AdditionalIncludeDirectories>C:\SDL\SDL2-2.0.14\include;C:\SDL\SDL2_image-2.0.5\include;C:\SDL\SDL2_mixer-2.0.4\include;C:\SDL\SDL2_ttf-2.0.15\include;C:\lib\glew\include\GL;C:\lib\eigen-3.4.0\eigen-3.4.0;C:\lib\glew\include;C:\lib\fftw-3.3.5-dll64;C:\OpenXLSX-0.3.2\OpenXLSX</AdditionalIncludeDirectories>
+      <AdditionalIncludeDirectories>C:\SDL\SDL2-2.0.14\include;C:\SDL\SDL2_image-2.0.5\include;C:\SDL\SDL2_mixer-2.0.4\include;C:\SDL\SDL2_ttf-2.0.15\include;C:\lib\glew\include\GL;C:\lib\eigen-3.4.0\eigen-3.4.0;C:\lib\glew\include;C:\lib\fftw-3.3.5-dll64;C:\OpenXLSX-0.3.2\OpenXLSX;C:\liblbfgs-master\include;C:\nlopt-2.8.0\src\api;C:\nlopt-2.8.0\src;C:\vcpkg\installed\x64-windows\include\glog;C:\CppNumericalSolvers-main\include</AdditionalIncludeDirectories>
       <EnableModules>true</EnableModules>
       <BuildStlModules>true</BuildStlModules>
+      <RuntimeLibrary>MultiThreadedDebugDLL</RuntimeLibrary>
     </ClCompile>
     <Link>
       <SubSystem>Console</SubSystem>
       <GenerateDebugInformation>true</GenerateDebugInformation>
-      <AdditionalLibraryDirectories>C:\SDL\SDL2-2.0.14\lib\x64;C:\SDL\SDL2_image-2.0.5\lib\x64;C:\SDL\SDL2_ttf-2.0.15\lib\x64;C:\SDL\SDL2_mixer-2.0.4\lib\x64;C:\lib\glew\lib\Debug\x64;C:\lib\fftw-3.3.5-dll64;C:\OpenXLSX-0.3.2\build\output\Debug</AdditionalLibraryDirectories>
-      <AdditionalDependencies>SDL2.lib;SDL2main.lib;SDL2test.lib;SDL2_image.lib;SDL2_mixer.lib;SDL2_ttf.lib;glew32d.lib;glew32sd.lib;opengl32.lib;glu32.lib;libfftw3l-3.lib;libfftw3-3.lib;libfftw3f-3.lib;OpenXLSXd.lib;%(AdditionalDependencies)</AdditionalDependencies>
+      <AdditionalLibraryDirectories>C:\SDL\SDL2-2.0.14\lib\x64;C:\SDL\SDL2_image-2.0.5\lib\x64;C:\SDL\SDL2_ttf-2.0.15\lib\x64;C:\SDL\SDL2_mixer-2.0.4\lib\x64;C:\lib\glew\lib\Debug\x64;C:\lib\fftw-3.3.5-dll64;C:\OpenXLSX-0.3.2\build\output\Debug;C:\liblbfgs-master\build\Debug;C:\nlopt-2.8.0\build\Debug;C:\vcpkg\installed\x64-windows\lib</AdditionalLibraryDirectories>
+      <AdditionalDependencies>SDL2.lib;SDL2main.lib;SDL2test.lib;SDL2_image.lib;SDL2_mixer.lib;SDL2_ttf.lib;glew32d.lib;glew32sd.lib;opengl32.lib;glu32.lib;libfftw3l-3.lib;libfftw3-3.lib;libfftw3f-3.lib;OpenXLSXd.lib;lbfgsd.lib;nlopt.lib;glog.lib;%(AdditionalDependencies)</AdditionalDependencies>
     </Link>
   </ItemDefinitionGroup>
   <ItemDefinitionGroup Condition="'$(Configuration)|$(Platform)'=='Release|x64'">
@@ -138,6 +139,7 @@
     <ClCompile Include="cubicSpline.ixx" />
     <ClCompile Include="drawer.ixx" />
     <ClCompile Include="exAddOn.ixx" />
+    <ClCompile Include="FileName.cpp" />
     <ClCompile Include="Func.ixx" />
     <ClCompile Include="globalVar.ixx" />
     <ClCompile Include="inputCol.ixx" />

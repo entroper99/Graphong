@@ -11,16 +11,6 @@
 export module exAddOn;
 
 
-export inline double calcGaussian(double dx, double dy, double dz, double sigma, double amplitude)
-{
-    return amplitude * std::exp(-(dx * dx + dy * dy + dz * dz) / (2 * sigma * sigma));
-}
-export inline double calcGaussianFast(double dx, double dy, double dz, const double& invSig, double amplitude)
-{
-    double distanceSq = dx * dx + dy * dy + dz * dz;
-    return amplitude * std::exp(-distanceSq * invSig);
-}
-
 export double*** create3DArray(int x, int y, int z)
 {
     double*** array3D = new double** [x];
@@ -105,24 +95,17 @@ export std::vector<std::array<double, 3>> makeGyroidPoints(double boxSize)
     return gyroidPoints;
 }
 
+export inline double calcGaussian(double dx, double dy, double dz, double sigma, double amplitude)
+{
+    return amplitude * std::exp(-(dx * dx + dy * dy + dz * dz) / (2 * sigma * sigma));
+}
+export inline double calcGaussianFast(double dx, double dy, double dz, const double& invSig, double amplitude)
+{
+    double distanceSq = dx * dx + dy * dy + dz * dz;
+    return amplitude * std::exp(-distanceSq * invSig);
+}
 export double createDensityFunction(const std::vector<std::array<double, 3>>& inputPoints, double inputBoxSize, double*** density, const int& resolution)
 {
-    std::vector<std::array<double, 3>> pbcPoints;
-
-    for (size_t i = 0; i < inputPoints.size(); i++)
-    {
-        for (int dx = -1; dx <= 1; dx++)
-        {
-            for (int dy = -1; dy <= 1; dy++)
-            {
-                for (int dz = -1; dz <= 1; dz++)
-                {
-                    pbcPoints.push_back({ inputPoints[i][0] + dx * inputBoxSize,inputPoints[i][1] + dy * inputBoxSize,inputPoints[i][2] + dz * inputBoxSize });
-                }
-            }
-        }
-    }
-
     //std::printf("RESOL : %d, pointsSize : %d, inputBoxSize : %f\n", RESOLUTION, pbcPoints.size(), inputBoxSize);
     const double SIG = 0.68;
     const double SIG2 = SIG * SIG;
@@ -137,7 +120,7 @@ export double createDensityFunction(const std::vector<std::array<double, 3>>& in
     double cutoff = 3.0 * SIG; //진폭의 99.7프로를 포함하는 값 
     double cutoffSq = cutoff * cutoff;
 
-    auto calculateDensityPart = [&density, &pbcPoints, inputBoxSize, SIG, INV_SIG, gaussAmp, cutoffSq, resolution](int startIdx, int endIdx)
+    auto calculateDensityPart = [&density, &inputPoints, inputBoxSize, SIG, INV_SIG, gaussAmp, cutoffSq, resolution](int startIdx, int endIdx)
         {
             //for (const auto& point : pbcPoints)std::printf("pbcPoints : %f,%f,%f\n", point[0],point[1],point[2]);
             for (int i = startIdx; i < endIdx; ++i)
@@ -157,11 +140,16 @@ export double createDensityFunction(const std::vector<std::array<double, 3>>& in
                 double densityValue = 0;
 
 
-                for (const auto& point : pbcPoints)
+                for (const auto& point : inputPoints)
                 {
                     double dx = point[0] - tgtX;
                     double dy = point[1] - tgtY;
                     double dz = point[2] - tgtZ;
+
+                    dx -= inputBoxSize * std::round(dx / inputBoxSize);
+                    dy -= inputBoxSize * std::round(dy / inputBoxSize);
+                    dz -= inputBoxSize * std::round(dz / inputBoxSize);
+
                     double dist = dx * dx + dy * dy + dz * dz;
                     if (dist < cutoffSq)
                     {
@@ -199,6 +187,122 @@ export double createDensityFunction(const std::vector<std::array<double, 3>>& in
     return meanVal;
 }
 
+export double*** createLaplacian(double*** density, int resol, double boxSize)
+{
+    double*** laplacian = create3DArray(resol, resol, resol);
+    double del = boxSize / (resol - 1);
+    double delSquared = del * del;
+    for (int x = 0; x < resol; x++)
+    {
+        for (int y = 0; y < resol; y++)
+        {
+            for (int z = 0; z < resol; z++)
+            {
+                laplacian[x][y][z] = 0;
+
+                int x_next = (x + 1) % resol;
+                int x_prev = (x - 1 + resol) % resol;
+                int y_next = (y + 1) % resol;
+                int y_prev = (y - 1 + resol) % resol;
+                int z_next = (z + 1) % resol;
+                int z_prev = (z - 1 + resol) % resol;
+
+                laplacian[x][y][z] += (density[x_next][y][z] - 2 * density[x][y][z] + density[x_prev][y][z]);
+                laplacian[x][y][z] += (density[x][y_next][z] - 2 * density[x][y][z] + density[x][y_prev][z]);
+                laplacian[x][y][z] += (density[x][y][z_next] - 2 * density[x][y][z] + density[x][y][z_prev]);
+                laplacian[x][y][z] /= delSquared;
+            }
+        }
+    }
+    return laplacian;
+}
+
+export double*** createDerivative3(double*** density, int resol, double boxSize)
+{
+    double*** deriv3 = create3DArray(resol, resol, resol);
+    double del = boxSize / (resol - 1);
+    double delCubed = del * del * del;
+
+    for (int x = 0; x < resol; x++)
+    {
+        for (int y = 0; y < resol; y++)
+        {
+            for (int z = 0; z < resol; z++)
+            {
+                int x_next = (x + 1) % resol;
+                int x_prev = (x - 1 + resol) % resol;
+                int x_next2 = (x + 2) % resol;
+                int x_prev2 = (x - 2 + resol) % resol;
+
+                int y_next = (y + 1) % resol;
+                int y_prev = (y - 1 + resol) % resol;
+                int y_next2 = (y + 2) % resol;
+                int y_prev2 = (y - 2 + resol) % resol;
+
+                int z_next = (z + 1) % resol;
+                int z_prev = (z - 1 + resol) % resol;
+                int z_next2 = (z + 2) % resol;
+                int z_prev2 = (z - 2 + resol) % resol;
+
+                deriv3[x][y][z] = (density[x_next2][y][z] - 2 * density[x_next][y][z] + 2 * density[x_prev][y][z] - density[x_prev2][y][z]) / (2 * delCubed);
+                deriv3[x][y][z] += (density[x][y_next2][z] - 2 * density[x][y_next][z] + 2 * density[x][y_prev][z] - density[x][y_prev2][z]) / (2 * delCubed);
+                deriv3[x][y][z] += (density[x][y][z_next2] - 2 * density[x][y][z_next] + 2 * density[x][y][z_prev] - density[x][y][z_prev2]) / (2 * delCubed);
+            }
+        }
+    }
+    return deriv3;
+}
+
+export double*** createDerivative4(double*** density, int resol, double boxSize)
+{
+    double*** deriv4 = create3DArray(resol, resol, resol);
+    double del = boxSize / (resol - 1);
+    double delFourth = del * del * del * del;
+
+    for (int x = 0; x < resol; x++)
+    {
+        for (int y = 0; y < resol; y++)
+        {
+            for (int z = 0; z < resol; z++)
+            {
+                // 주기적인 경계 조건을 적용
+                int x_next = (x + 1) % resol;
+                int x_prev = (x - 1 + resol) % resol;
+                int x_next2 = (x + 2) % resol;
+                int x_prev2 = (x - 2 + resol) % resol;
+                int x_next3 = (x + 3) % resol;
+                int x_prev3 = (x - 3 + resol) % resol;
+                int x_next4 = (x + 4) % resol;
+                int x_prev4 = (x - 4 + resol) % resol;
+
+                int y_next = (y + 1) % resol;
+                int y_prev = (y - 1 + resol) % resol;
+                int y_next2 = (y + 2) % resol;
+                int y_prev2 = (y - 2 + resol) % resol;
+                int y_next3 = (y + 3) % resol;
+                int y_prev3 = (y - 3 + resol) % resol;
+                int y_next4 = (y + 4) % resol;
+                int y_prev4 = (y - 4 + resol) % resol;
+
+                int z_next = (z + 1) % resol;
+                int z_prev = (z - 1 + resol) % resol;
+                int z_next2 = (z + 2) % resol;
+                int z_prev2 = (z - 2 + resol) % resol;
+                int z_next3 = (z + 3) % resol;
+                int z_prev3 = (z - 3 + resol) % resol;
+                int z_next4 = (z + 4) % resol;
+                int z_prev4 = (z - 4 + resol) % resol;
+
+                // 4차 중앙 차분을 이용한 4차 도함수 계산
+                deriv4[x][y][z] = (-density[x_next4][y][z] + 4 * density[x_next3][y][z] - 6 * density[x_next2][y][z] + 4 * density[x_next][y][z] - 6 * density[x][y][z] + 4 * density[x_prev][y][z] - 6 * density[x_prev2][y][z] + 4 * density[x_prev3][y][z] - density[x_prev4][y][z]) / delFourth;
+                deriv4[x][y][z] += (-density[x][y_next4][z] + 4 * density[x][y_next3][z] - 6 * density[x][y_next2][z] + 4 * density[x][y_next][z] - 6 * density[x][y][z] + 4 * density[x][y_prev][z] - 6 * density[x][y_prev2][z] + 4 * density[x][y_prev3][z] - density[x][y_prev4][z]) / delFourth;
+                deriv4[x][y][z] += (-density[x][y][z_next4] + 4 * density[x][y][z_next3] - 6 * density[x][y][z_next2] + 4 * density[x][y][z_next] - 6 * density[x][y][z] + 4 * density[x][y][z_prev] - 6 * density[x][y][z_prev2] + 4 * density[x][y][z_prev3] - density[x][y][z_prev4]) / delFourth;
+            }
+        }
+    }
+    return deriv4;
+}
+
 export double densityToStdev(double*** density, double boxSize, const int resol)
 {
     double*** laplacian = new double** [resol - 2];
@@ -220,6 +324,8 @@ export double densityToStdev(double*** density, double boxSize, const int resol)
             for (int z = 1; z < resol - 1; z++)
             {
                 laplacian[x - 1][y - 1][z - 1] = 0;
+
+
                 laplacian[x - 1][y - 1][z - 1] += (density[x + 1][y][z] - 2 * density[x][y][z] + density[x - 1][y][z]);
                 laplacian[x - 1][y - 1][z - 1] += (density[x][y + 1][z] - 2 * density[x][y][z] + density[x][y - 1][z]);
                 laplacian[x - 1][y - 1][z - 1] += (density[x][y][z + 1] - 2 * density[x][y][z] + density[x][y][z - 1]);
@@ -286,29 +392,6 @@ export int densityToSurface(double*** density, const int& resolution, const doub
     return pointNumber;
 }
 
-//@brief resolution의 density를 입력하면 resolution-2의 라플라시안을 반환
-export double*** createLaplacian(double*** density, int resolution, double boxSize)
-{
-    double*** laplacian = create3DArray(resolution - 2, resolution - 2, resolution - 2);
-    double del = boxSize / (resolution - 1);
-    double delSquared = del * del;
-    for (int x = 1; x < resolution - 1; x++)
-    {
-        for (int y = 1; y < resolution - 1; y++)
-        {
-            for (int z = 1; z < resolution - 1; z++)
-            {
-                laplacian[x - 1][y - 1][z - 1] = 0;
-                laplacian[x - 1][y - 1][z - 1] += (density[x + 1][y][z] - 2 * density[x][y][z] + density[x - 1][y][z]);
-                laplacian[x - 1][y - 1][z - 1] += (density[x][y + 1][z] - 2 * density[x][y][z] + density[x][y - 1][z]);
-                laplacian[x - 1][y - 1][z - 1] += (density[x][y][z + 1] - 2 * density[x][y][z] + density[x][y][z - 1]);
-                laplacian[x - 1][y - 1][z - 1] /= delSquared;
-            }
-        }
-    }
-    return laplacian;
-}
-
 export std::vector<std::array<double, 3>> createHistogramDel(const std::vector<double>& inputDataset, double del)
 {
     //xy데이터로 히스토그램을 만듭니다
@@ -316,15 +399,14 @@ export std::vector<std::array<double, 3>> createHistogramDel(const std::vector<d
 
     double minVal = *std::min_element(inputDataset.begin(), inputDataset.end());
     double maxVal = *std::max_element(inputDataset.begin(), inputDataset.end());
-    int numBins = std::ceil((maxVal - minVal) / del);
+    int numBins = std::ceil((maxVal - minVal) / del); //구간의 숫자
 
     //std::printf("numBins : %d\n", numBins);
 
     newPoints.resize(numBins);
     for (int i = 0; i < numBins; i++)
     {
-        //newPoints[i] = { (double)i,0.0,0.0 };
-        newPoints[i] = { (minVal + del*(double)i),0.0,0.0 };
+        newPoints[i] = { (double)i,0.0,0.0 };
     }
 
     for (size_t i = 0; i < inputDataset.size(); i++)
@@ -332,9 +414,14 @@ export std::vector<std::array<double, 3>> createHistogramDel(const std::vector<d
         int binIndex = (int)((inputDataset[i] - minVal) / del);
         if (binIndex == numBins) binIndex--;
 
-        if (binIndex < numBins && binIndex >= 0) newPoints[binIndex][1] += 1;
+        if (binIndex < numBins && binIndex >= 0)
+        {
+            newPoints[binIndex][1] += 1;
+        }
     }
 
+    //std::printf("Histogram data (index, count, placeholder):\n");
+    //for (const auto& point : newPoints) std::printf("Bin: %.2f, Count: %.2f, Placeholder: %.2f\n", point[0], point[1], point[2]);
 
     return newPoints;
 }
@@ -344,178 +431,4 @@ export std::vector<std::array<double, 3>> createHistogramSize(const std::vector<
     double maxVal = *std::max_element(inputDataset.begin(), inputDataset.end());
     double del = (maxVal - minVal) / (double)inputSize;
     return createHistogramDel(inputDataset, del);
-}
-
-export std::vector<std::array<double,3>> arrayToHistogram(double*** array, const int& resolution, int histoSize)
-{
-    std::vector<double> linearData;
-    for (int x = 0; x < resolution; x++)
-    {
-        for (int y = 0; y < resolution; y++)
-        {
-            for (int z = 0; z < resolution; z++)
-            {
-                linearData.push_back(array[x][y][z]);
-            }
-        }
-    }
-    return createHistogramSize(linearData, histoSize);
-}
-
-
-export double arrayToMean(double*** array, const int& resolution)
-{
-    double totalVal = 0.0;
-    for (int x = 0; x < resolution; x++)
-    {
-        for (int y = 0; y < resolution; y++)
-        {
-            for (int z = 0; z < resolution; z++)
-            {
-                totalVal += array[x][y][z];
-            }
-        }
-    }
-    double mean = totalVal / (double)(resolution * resolution * resolution);
-    return mean;
-}
-
-export double arrayToStdev(double*** array, const int& resolution)
-{
-    double variance = 0.0;
-    double mean = arrayToMean(array, resolution);
-    for (int x = 0; x < resolution; x++)
-    {
-        for (int y = 0; y < resolution; y++)
-        {
-            for (int z = 0; z < resolution; z++)
-            {
-                variance += std::pow(array[x][y][z] - mean, 2.0);
-            }
-        }
-    }
-    variance /= (double)(resolution * resolution * resolution);
-    double stdev = std::sqrt(variance);
-    return stdev;
-}
-
-
-export double arrayToSkewness(double*** array, const int& resolution)
-{
-    double skewness = 0.0;
-    double stdev = arrayToStdev(array, resolution);
-    double mean = arrayToMean(array, resolution);
-    if (stdev == 0) std::wcerr << L"standard deviation is zero in arrayToSkewness.";
-    for (int x = 0; x < resolution; x++)
-    {
-        for (int y = 0; y < resolution; y++)
-        {
-            for (int z = 0; z < resolution; z++)
-            {
-                skewness += std::pow((array[x][y][z] - mean) / stdev, 3.0);
-            }
-        }
-    }
-    return skewness;
-}
-
-export double wassersteinDist(const std::vector<std::array<double, 3>>& data)
-{
-    int size = data.size();
-    std::vector<double> aCDF(size);
-    std::vector<double> bCDF(size);
-
-
-    aCDF[0] = data[0][1];
-    bCDF[0] = data[0][2];
-    for (int i = 1; i < size; i++)
-    {
-        aCDF[i] = aCDF[i - 1] + data[i][1];
-        bCDF[i] = bCDF[i - 1] + data[i][2];
-    }
-
-    for (int i = 0; i < size; i++)
-    {
-        aCDF[i] /= aCDF[size - 1];
-        bCDF[i] /= bCDF[size - 1];
-    }
-
-    double wDist = 0;
-    for (int i = 0; i < size - 1; i++)
-    {
-        double diff = std::abs(bCDF[i] - aCDF[i]);
-        double interval = data[i + 1][0] - data[i][0];
-        wDist += diff * interval;
-
-    }
-    return wDist;
-}
-
-export double wassersteinDist(const std::vector<std::array<double, 3>>& data1, const std::vector<std::array<double, 3>>& data2)
-{
-    if (data1.size() != data2.size()) std::cerr << "Size of input data1 and data2 is different in wassersteinDist.\n";
-    std::vector<std::array<double, 3>> newData;
-    for (int i = 0; i < data1.size(); i++) newData.push_back({ data1[i][0],data1[i][1],data2[i][1] });
-    return wassersteinDist(newData);
-}
-
-
-export double JSDivergence(const std::vector<std::array<double, 3>>& data)
-{
-    int size = data.size();
-    double aSum = 0, bSum = 0;
-    for (int i = 0; i < size; i++)
-    {
-        aSum += data[i][1];
-        bSum += data[i][2];
-    }
-
-    if (aSum == 0 || bSum == 0)
-    {
-        std::cerr << "[Error] One of the distributions sums to zero." << std::endl;
-        std::exit(EXIT_FAILURE);
-    }
-
-    std::vector<double> normA(size);
-    std::vector<double> normB(size);
-
-    for (int i = 0; i < size; i++)
-    {
-        normA[i] = data[i][1] / aSum;
-        normB[i] = data[i][2] / bSum;
-    }
-
-    std::vector<double> mData(size);
-    for (int i = 0; i < size; i++)
-    {
-        mData[i] = 0.5 * (normA[i] + normB[i]);
-    }
-
-    double aKL = 0;
-    for (int i = 0; i < size; i++)
-    {
-        if (normA[i] > 0)
-        {
-            aKL += normA[i] * std::log(normA[i] / mData[i]);
-        }
-    }
-
-    double bKL = 0;
-    for (int i = 0; i < size; i++)
-    {
-        if (normB[i] > 0)
-        {
-            bKL += normB[i] * std::log(normB[i] / mData[i]);
-        }
-    }
-
-    return 0.5 * (aKL + bKL);
-}
-
-export double JSDivergence(const std::vector<std::array<double, 3>>& data1, const std::vector<std::array<double, 3>>& data2)
-{
-    if(data1.size()!=data2.size()) std::cerr << "Size of input data1 and data2 is different in JSDivergence.\n";
-    std::vector<std::array<double, 3>> newData;
-    for (int i = 0; i < data1.size(); i++) newData.push_back({ data1[i][0],data1[i][1],data2[i][1] });
-    return JSDivergence(newData);
 }

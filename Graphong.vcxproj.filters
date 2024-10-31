@@ -63,5 +63,8 @@
     <ClCompile Include="exAddOn.ixx">
       <Filter>헤더 파일</Filter>
     </ClCompile>
+    <ClCompile Include="FileName.cpp">
+      <Filter>소스 파일</Filter>
+    </ClCompile>
   </ItemGroup>
 </Project>

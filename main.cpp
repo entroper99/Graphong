@@ -1,3 +1,5 @@
+#define GLOG_NO_ABBREVIATED_SEVERITIES
+#define GLOG_USE_GLOG_EXPORT
 #define _SILENCE_ALL_CXX23_DEPRECATION_WARNINGS
 
 #include <SDL.h>
@@ -10,6 +12,7 @@
 #include <string>
 #include <iostream>
 #include <fftw3.h>
+#include <pagmo/pagmo.hpp>
 
 
 import std;
@@ -26,6 +29,7 @@ import utilFile;
 import randomRange;
 import exAddOn;
 
+
 void prtFuncName()
 {
     for (int i = 0; i < funcSet.size(); i++)
@@ -37,10 +41,205 @@ void prtFuncName()
     }
 }
 
+template <typename T>
+T Sigmoid(T x) {
+    return T(1) / (T(1) + exp(-x));
+}
+
+struct EvalData 
+{
+    std::vector<std::array<double,3>> points;
+    double boxSize;
+    int counter;
+};
+
+
+class MaxFxProblem {
+public:
+    MaxFxProblem() : data() {}
+    MaxFxProblem(const EvalData& data) : data(data) {}
+    MaxFxProblem(const MaxFxProblem& other) : data(other.data) {}
+
+    std::vector<double> fitness(const std::vector<double>& x) const
+    {
+        double dx = x[0] - data.boxSize * std::floor(x[0] / data.boxSize);
+        double dy = x[1] - data.boxSize * std::floor(x[1] / data.boxSize);
+        double dz = x[2] - data.boxSize * std::floor(x[2] / data.boxSize);
+
+        Eigen::Vector3d translation(dx, dy, dz);
+
+        double da = x[3] - 2 * M_PI * std::floor(x[3] / (2 * M_PI));
+        double db = x[4] - 2 * M_PI * std::floor(x[4] / (2 * M_PI));
+        double dc = x[5] - 2 * M_PI * std::floor(x[5] / (2 * M_PI));
+
+        double totalVal = 0;
+        
+        double length = data.boxSize;//1주기(유닛셀)
+        //double length = data.boxSize / 2.0;//2주기
+        
+        double scaleFactor = 2.0 * M_PI / length;
+
+        Eigen::Matrix3d Rx;
+        Rx << 1, 0, 0,
+            0, std::cos(da), -std::sin(da),
+            0, std::sin(da), std::cos(da);
+
+        Eigen::Matrix3d Ry;
+        Ry << std::cos(db), 0, std::sin(db),
+            0, 1, 0,
+            -std::sin(db), 0, std::cos(db);
+
+        Eigen::Matrix3d Rz;
+        Rz << std::cos(dc), -std::sin(dc), 0,
+            std::sin(dc), std::cos(dc), 0,
+            0, 0, 1;
+
+        Eigen::Matrix3d R = Rz * Ry * Rx;
+
+        for (size_t i = 0; i < data.points.size(); i++) {
+            double xi = data.points[i][0];
+            double yi = data.points[i][1];
+            double zi = data.points[i][2];
+
+            Eigen::Vector3d p(xi, yi, zi);
+            Eigen::Vector3d p_translated = p + translation;
+            Eigen::Vector3d p_transformed = R * p_translated;
+
+            double sx = scaleFactor * p_transformed(0);
+            double sy = scaleFactor * p_transformed(1);
+            double sz = scaleFactor * p_transformed(2);
+
+            totalVal += (std::cos(sx) * std::sin(sy) * std::sin(2 * sz) +
+                std::cos(sy) * std::sin(sz) * std::sin(2 * sx) +
+                std::cos(sz) * std::sin(sx) * std::sin(2 * sy));
+        }
+
+        double fx = totalVal / static_cast<double>(data.points.size());
+        return { -fx };
+    }
+
+
+    std::size_t get_nx() const 
+    {
+        return 6;
+    }
+
+    std::size_t get_nobj() const 
+    {
+        return 1;
+    }
+
+    std::pair<std::vector<double>, std::vector<double>> get_bounds() const 
+    {
+        return {
+            { 0.0, 0.0, 0.0, 0.0, 0.0, 0.0 }, // 하한
+            { data.boxSize, data.boxSize, data.boxSize, 2 * M_PI, 2 * M_PI, 2 * M_PI } // 상한
+        };
+    }
+
+    std::string get_name() const 
+    {
+        return "MaxFxProblem";
+    }
+
+private:
+    EvalData data;
+};
+
+
+
+double objective_function(const std::vector<double>& x, std::vector<double>& grad, void* f_data)
+{
+    EvalData* data = static_cast<EvalData*>(f_data);
+
+    double dx = x[0] - data->boxSize * std::floor(x[0] / data->boxSize);
+    double dy = x[1] - data->boxSize * std::floor(x[1] / data->boxSize);
+    double dz = x[2] - data->boxSize * std::floor(x[2] / data->boxSize);
+
+    if (!grad.empty())
+    {
+        grad[0] = 0;
+        grad[1] = 0;
+        grad[2] = 0;
+    }
+
+    double totalVal = 0;
+    double scaleFactor = 2.0 * M_PI / (data->boxSize);
+
+    for (size_t i = 0; i < data->points.size(); i++)
+    {
+        double df_dx = 0.0, df_dy = 0.0, df_dz = 0.0;
+        double xi = data->points[i][0];
+        double yi = data->points[i][1];
+        double zi = data->points[i][2];
+
+        double sx = scaleFactor * (xi + dx);
+        double sy = scaleFactor * (yi + dy);
+        double sz = scaleFactor * (zi + dz);
+
+        double cos_sx = std::cos(sx);
+        double sin_sx = std::sin(sx);
+        double cos_sy = std::cos(sy);
+        double sin_sy = std::sin(sy);
+        double cos_sz = std::cos(sz);
+        double sin_sz = std::sin(sz);
+
+        double sin_2sx = std::sin(2 * sx);
+        double cos_2sx = std::cos(2 * sx);
+        double sin_2sy = std::sin(2 * sy);
+        double cos_2sy = std::cos(2 * sy);
+        double sin_2sz = std::sin(2 * sz);
+        double cos_2sz = std::cos(2 * sz);
+
+        totalVal += (cos_sx * sin_sy * sin_2sz +
+            cos_sy * sin_sz * sin_2sx +
+            cos_sz * sin_sx * sin_2sy);
+
+        df_dx = -scaleFactor * sin_sx * sin_sy * sin_2sz +
+            2 * scaleFactor * cos_sy * sin_sz * cos_2sx +
+            scaleFactor * cos_sz * cos_sx * sin_2sy;
+
+        df_dy = scaleFactor * cos_sx * cos_sy * sin_2sz -
+            scaleFactor * sin_sy * sin_sz * sin_2sx +
+            2 * scaleFactor * cos_sz * sin_sx * cos_2sy;
+
+        df_dz = 2 * scaleFactor * cos_sx * sin_sy * cos_2sz +
+            scaleFactor * cos_sy * cos_sz * sin_2sx -
+            scaleFactor * sin_sz * sin_sx * sin_2sy;
+
+        if (!grad.empty())
+        {
+            grad[0] += df_dx;
+            grad[1] += df_dy;
+            grad[2] += df_dz;
+        }
+    }
+
+    double fx = totalVal / static_cast<double>(data->points.size());
+
+    if (!grad.empty())
+    {
+        grad[0] /= static_cast<double>(data->points.size());
+        grad[1] /= static_cast<double>(data->points.size());
+        grad[2] /= static_cast<double>(data->points.size());
+
+        // 최대화를 위해 함수 값과 그래디언트를 음수로 만듭니다.
+        grad[0] = -grad[0];
+        grad[1] = -grad[1];
+        grad[2] = -grad[2];
+    }
+
+    data->counter++;
+
+    // 최대화를 위해 함수 값을 음수로 반환합니다.
+    return -fx;
+}
+
 int main(int argc, char** argv)
 {
     _CrtSetDbgFlag(_CRTDBG_ALLOC_MEM_DF | _CRTDBG_LEAK_CHECK_DF);
     bool debugMode = false;
+    bool darkMode = true;
 
     std::locale::global(std::locale("korean"));
     SDL_Init(SDL_INIT_VIDEO);
@@ -174,7 +373,7 @@ int main(int argc, char** argv)
             std::wprintf(L"\033[0;33m41. 회전 변화 테스트\033[0m\n");
             std::wprintf(L"\033[0;33m42. 128px 푸리에변환\033[0m\n");
             std::wprintf(L"\033[0;33m43. 결정구조 곡률 분석\033[0m\n");
-            std::wprintf(L"\033[0;33m44. 결정구조 곡률 분석(편차만 출력)\033[0m\n");
+            std::wprintf(L"\033[0;33m44. 결정구조 최적화 F값 분석\033[0m\n");
             std::wprintf(L"\033[0;33m45. 결정구조 곡률 히스토그램 출력\033[0m\n");
             std::wprintf(L"\033[0;33m45. 결정구조 레퍼런스 히스토그램 출력\033[0m\n");
             std::wprintf(L"\033[0;33m46. 결정구조 COORDINATION 출력\033[0m\n");
@@ -660,7 +859,7 @@ int main(int argc, char** argv)
             else if (input == 23) //자이로이드 생성
             {
                 Func* refGyroid = new Func(funcFlag::scalarField);
-                double length = BOX_SIZE / 2.0;
+                double length = BOX_SIZE;
                 double scaleFactor = 2.0 * M_PI / length;
                 refGyroid->scalarFunc = [=](double x, double y, double z)->double
                     {
@@ -670,13 +869,13 @@ int main(int argc, char** argv)
                 refGyroid->scalarInfimum = -1.0;// * std::sqrt(2);
                 refGyroid->scalarSupremum = 1.0;// *std::sqrt(2);
 
-                for (double x = 0; x <= BOX_SIZE / 2.0; x += 0.05)
+                for (double x = -BOX_SIZE / 2.0; x <= BOX_SIZE / 2.0; x += 0.2)
                 {
-                    for (double y = 0; y <= BOX_SIZE / 2.0; y += 0.05)
+                    for (double y = -BOX_SIZE / 2.0; y <= BOX_SIZE / 2.0; y += 0.2)
                     {
-                        for (double z = 0; z <= BOX_SIZE / 2.0; z += 0.05)
+                        for (double z = -BOX_SIZE / 2.0; z <= BOX_SIZE / 2.0; z += 0.2)
                         {
-                            if (refGyroid->scalarFunc(x, y, z) >= 0.79 && refGyroid->scalarFunc(x, y, z) <= 0.81) refGyroid->myPoints.push_back({ x, y, z });
+                            if (refGyroid->scalarFunc(x, y, z) >= -0.2 && refGyroid->scalarFunc(x, y, z) <= 0.2) refGyroid->myPoints.push_back({ x, y, z });
                         }
                     }
                 }
@@ -693,7 +892,7 @@ int main(int argc, char** argv)
                 {
                     Point pt = ((Func*)funcSet[dataIndex])->myPoints[i];
                     //std::wprintf(L"Index %d : {%.10f,%.10f,%.10f}\n", i, pt.x, pt.y, pt.z);
-                    std::wprintf(L"%.10f,%.10f,%.10f\n", i, pt.x, pt.y, pt.z);
+                    std::wprintf(L"(%.5f,%.5f,%.5f),\n", i, pt.x, pt.y, pt.z);
                 }
             }
             else if (input == 26)
@@ -1345,17 +1544,6 @@ int main(int argc, char** argv)
                         in.read(&str[0], size);
                         in.close();
 
-                        Func* timeGraphFunc = new Func(funcFlag::scalarField);
-                        timeGraphFunc->funcType = funcFlag::dim2;
-                        timeGraphFunc->funcName = L"평균";
-                        std::wprintf(L"첫번째 F_avg의 색을 뭘로 할까?\n");
-                        timeGraphFunc->myColor = rainbow(0);
-
-                        Func* timeGraphFunc2 = new Func(funcFlag::scalarField);
-                        timeGraphFunc2->funcType = funcFlag::dim2;
-                        timeGraphFunc2->funcName = L"분산";
-                        std::wprintf(L"두번째 F_avg의 색을 뭘로 할까?\n");
-                        timeGraphFunc2->myColor = rainbow(0.1);
 
                         Func* timeGraphFunc3 = new Func(funcFlag::scalarField);
                         timeGraphFunc3->funcType = funcFlag::dim2;
@@ -1363,23 +1551,6 @@ int main(int argc, char** argv)
                         std::wprintf(L"세번째 F_avg의 색을 뭘로 할까?\n");
                         timeGraphFunc3->myColor = rainbow(0.2);
 
-                        Func* timeGraphFunc4 = new Func(funcFlag::scalarField);
-                        timeGraphFunc4->funcType = funcFlag::dim2;
-                        timeGraphFunc4->funcName = L"첨도";
-                        std::wprintf(L"네번째 F_avg의 색을 뭘로 할까?\n");
-                        timeGraphFunc4->myColor = rainbow(0.35);
-
-                        Func* timeGraphFunc5 = new Func(funcFlag::scalarField);
-                        timeGraphFunc5->funcType = funcFlag::dim2;
-                        timeGraphFunc5->funcName = L"왜도";
-                        std::wprintf(L"다섯번째 F_avg의 색을 뭘로 할까?\n");
-                        timeGraphFunc5->myColor = rainbow(0.5);
-
-                        Func* timeGraphFunc6 = new Func(funcFlag::scalarField);
-                        timeGraphFunc6->funcType = funcFlag::dim2;
-                        timeGraphFunc6->funcName = L"컷오프";
-                        std::wprintf(L"여섯번째 F_avg의 색을 뭘로 할까?\n");
-                        timeGraphFunc6->myColor = rainbow(0.7);
 
                         Func* originGraphFunc = new Func(funcFlag::scalarField);
                         originGraphFunc->funcType = funcFlag::dim2;
@@ -1387,22 +1558,171 @@ int main(int argc, char** argv)
                         std::wprintf(L"원본 F_avg의 색을 뭘로 할까?\n");
                         originGraphFunc->myColor = { 0xff,0xff,0xff };
 
-
-
                         int i = 0;
                         while (1)
                         {
-                            const double BOX_SIZE = 5.22;//10.73;
+                            double width = 0.0;
+                            std::size_t box_pos = str.find("BOX BOUNDS");
+                            int number_count = 0;
+
+                            if (box_pos != std::string::npos)
+                            {
+                                for (std::size_t i = box_pos; i < str.size(); ++i)
+                                {
+                                    if (isdigit(str[i]) || str[i] == '-' || str[i] == '.')
+                                    {
+                                        double temp = std::stod(str.substr(i));
+                                        number_count++;
+
+                                        if (number_count == 2)
+                                        {
+                                            width = temp;
+                                            break;
+                                        }
+
+                                        while (i < str.size() && (isdigit(str[i]) || str[i] == '-' || str[i] == '.' || str[i] == 'e' || str[i] == '+'))
+                                            i++;
+                                    }
+                                }
+                            }
+                            std::cout << "Width: " << width << std::endl;
+
                             readTrjString(str, 9, -1, 2, 3, 4, 1, atomType);
                             Func* tgtGyroid = ((Func*)funcSet[funcSet.size() - 1]);
-                            double length = BOX_SIZE;
+                            double length = width/2;
                             double scaleFactor = 2.0 * M_PI / length;
                             tgtGyroid->scalarFunc = [=](double x, double y, double z)->double
                                 {
                                     return (std::cos(scaleFactor * x) * std::sin(scaleFactor * y) * std::sin(2 * (scaleFactor * z)) + std::cos(scaleFactor * y) * std::sin(scaleFactor * z) * std::sin(2 * (scaleFactor * x)) + std::cos(scaleFactor * z) * std::sin(scaleFactor * x) * std::sin(2 * (scaleFactor * y)));
                                 };
-                            tgtGyroid->translation(-BOX_SIZE / 2.0, -BOX_SIZE / 2.0, -BOX_SIZE / 2.0);
-                            tgtGyroid->latticeConstant = BOX_SIZE;// / 2.0;
+                            tgtGyroid->latticeConstant = width;
+                            tgtGyroid->translation(-width / 2.0, -width / 2.0, -width / 2.0);
+                            tgtGyroid->scalarCalc();
+                            originGraphFunc->myPoints.push_back({ (double)i,tgtGyroid->scalarSquareAvg(),0 });
+                            double originF = tgtGyroid->scalarSquareAvg();
+
+                            //Random translation
+                            Eigen::Vector3d inputVec = 
+                            { 
+                                randomRangeFloat(-width / 2.0,width / 2.0),
+                                randomRangeFloat(-width / 2.0,width / 2.0),
+                                randomRangeFloat(-width / 2.0,width / 2.0) 
+                            };
+                            tgtGyroid->latticeTranslation(tgtGyroid->myPoints, tgtGyroid->latticeConstant, inputVec);
+
+                            double xAngle = randomRangeFloat(0, 360.0);
+                            double yAngle = randomRangeFloat(0, 360.0);
+                            double zAngle = randomRangeFloat(0, 360.0);
+
+                            //Random rotation
+                            double xRad = xAngle * DEGREE_TO_RADIAN;
+                            double yRad = yAngle * DEGREE_TO_RADIAN;
+                            double zRad = zAngle * DEGREE_TO_RADIAN;
+
+                            Eigen::Matrix3d rotX, rotY, rotZ;
+                            rotX << 1, 0, 0,
+                                0, cos(xRad), -sin(xRad),
+                                0, sin(xRad), cos(xRad);
+
+                            rotY << cos(yRad), 0, sin(yRad),
+                                0, 1, 0,
+                                -sin(yRad), 0, cos(yRad);
+
+                            rotZ << cos(zRad), -sin(zRad), 0,
+                                sin(zRad), cos(zRad), 0,
+
+                                0, 0, 1;
+                            Eigen::Matrix3d inputRot = rotZ * rotY * rotX;
+                            tgtGyroid->latticeRotation(tgtGyroid->myPoints, tgtGyroid->latticeConstant, inputRot);
+
+
+                            //std::wprintf(L"TIME %d : 랜덤 평행이동 : (%f,%f,%f), 랜덤 회전 : (%f,%f,%f)\n", i, inputVec[0], inputVec[1], inputVec[2], xAngle, yAngle, zAngle);
+                            const int resol = 32;
+                            double*** density = create3DArray(resol, resol, resol);
+                            createDensityFunction(tgtGyroid->getRawPoints(), width, density, resol);
+                            double stdev = densityToStdev(density, width, resol);
+
+                            timeGraphFunc3->myPoints.push_back({ (double)i,stdev,0 });
+                            delete tgtGyroid;
+
+                            size_t firstTimestepPos = str.find("ITEM: TIMESTEP");
+                            size_t secondTimestepPos = str.find("ITEM: TIMESTEP", firstTimestepPos + 1);
+                            if (secondTimestepPos == std::string::npos) break;
+                            else str = str.substr(secondTimestepPos);
+                            i++;
+                        }
+                    }
+                    else std::wprintf(L"파일을 읽는데 실패하였습니다.\n");
+                }
+            }
+            else if (input == 44)
+            {
+                for (int atomType = 2; atomType <= 2; atomType++)//원자2만 진행하도록
+                {
+                    std::wstring file = L"";
+                    std::wprintf(L"데이터가 있는 파일을 선택해주세요.\n");
+                    file = openFileDialog();
+                    std::wprintf(L"파일 %ls 를 대상으로 설정하였다.\n", file.c_str());
+                    std::ifstream in(file);
+                    if (in.is_open())
+                    {
+                        std::string str;
+                        in.seekg(0, std::ios::end);
+                        size_t size = in.tellg();
+                        str.resize(size);
+                        in.seekg(0, std::ios::beg);
+                        in.read(&str[0], size);
+                        in.close();
+
+                        Func* optGraphFunc = new Func(funcFlag::scalarField);
+                        optGraphFunc->funcType = funcFlag::dim2;
+                        optGraphFunc->funcName = L"평균";
+                        optGraphFunc->myColor = rainbow(0);
+
+                        Func* originGraphFunc = new Func(funcFlag::scalarField);
+                        originGraphFunc->funcType = funcFlag::dim2;
+                        originGraphFunc->funcName = L"원본 F값";
+                        originGraphFunc->myColor = { 0xff,0xff,0xff };
+
+                        int i = 0;
+                        while (1)
+                        {
+                            double width = 0.0;
+                            std::size_t box_pos = str.find("BOX BOUNDS");
+                            int number_count = 0;
+                            if (box_pos != std::string::npos)
+                            {
+                                for (std::size_t i = box_pos; i < str.size(); ++i)
+                                {
+                                    if (isdigit(str[i]) || str[i] == '-' || str[i] == '.')
+                                    {
+                                        double temp = std::stod(str.substr(i));
+                                        number_count++;
+
+                                        if (number_count == 2)
+                                        {
+                                            width = temp;
+                                            break;
+                                        }
+
+                                        while (i < str.size() && (isdigit(str[i]) || str[i] == '-' || str[i] == '.' || str[i] == 'e' || str[i] == '+'))
+                                            i++;
+                                    }
+                                }
+                            }
+                            std::cout << "Width: " << width << std::endl;
+
+                            readTrjString(str, 9, -1, 2, 3, 4, 1, atomType);
+                            Func* tgtGyroid = ((Func*)funcSet[funcSet.size() - 1]);
+                            //double length = width/2.0;
+                            double length = width;
+                            double scaleFactor = 2.0 * M_PI / length;
+                            tgtGyroid->scalarFunc = [=](double x, double y, double z)->double
+                                {
+                                    return (std::cos(scaleFactor * x) * std::sin(scaleFactor * y) * std::sin(2 * (scaleFactor * z)) + std::cos(scaleFactor * y) * std::sin(scaleFactor * z) * std::sin(2 * (scaleFactor * x)) + std::cos(scaleFactor * z) * std::sin(scaleFactor * x) * std::sin(2 * (scaleFactor * y)));
+                                };
+                            tgtGyroid->translation(-width / 2.0, -width / 2.0, -width / 2.0);
+                            tgtGyroid->latticeConstant = width;// / 2.0;
                             tgtGyroid->scalarCalc();
                             originGraphFunc->myPoints.push_back({ (double)i,tgtGyroid->scalarSquareAvg(),0 });
                             double originF = tgtGyroid->scalarSquareAvg();
@@ -1435,19 +1755,40 @@ int main(int argc, char** argv)
                             Eigen::Matrix3d inputRot = rotZ * rotY * rotX;
                             tgtGyroid->latticeRotation(tgtGyroid->myPoints, tgtGyroid->latticeConstant, inputRot); //랜덤 회전
 
-                            std::wprintf(L"TIME %d : 랜덤 평행이동 : (%f,%f,%f), 랜덤 회전 : (%f,%f,%f)\n", i, inputVec[0], inputVec[1], inputVec[2], xAngle, yAngle, zAngle);
-                            const int resol = 64;
-                            double*** density = create3DArray(resol, resol, resol);
-                            createDensityFunction(tgtGyroid->getRawPoints(), tgtGyroid->latticeConstant, density, resol);
-                            std::array<double, 6> result = tgtGyroid->getCurvData(density, resol, tgtGyroid->latticeConstant);
 
-                            
-                            timeGraphFunc->myPoints.push_back({ (double)i,result[0],0 });
-                            timeGraphFunc2->myPoints.push_back({ (double)i,result[1],0 });
-                            timeGraphFunc3->myPoints.push_back({ (double)i,result[2],0 });
-                            timeGraphFunc4->myPoints.push_back({ (double)i,result[3],0 });
-                            timeGraphFunc5->myPoints.push_back({ (double)i,result[4],0 });
-                            timeGraphFunc6->myPoints.push_back({ (double)i,(double)densityToSurface(density, resol, 0.7, 0.05),0 });
+                            double optF;
+
+                            if(1)
+                            {
+                                EvalData data;
+                                data.boxSize = width; 
+                                data.points = tgtGyroid->getRawPoints();
+
+                                MaxFxProblem prob{ data };
+                                pagmo::problem p{ prob };
+                                pagmo::algorithm algo{ pagmo::de(100) }; 
+                                pagmo::population pop{ p, 400 };
+                                pop = algo.evolve(pop);
+                                auto best_fitness = pop.get_f()[pop.best_idx()][0];
+                                auto best_solution = pop.get_x()[pop.best_idx()];
+
+                                std::cout << "최적의 fx 값: " << -best_fitness << std::endl;
+                                std::cout << "최적의 매개변수:" << std::endl;
+                                std::cout << "dx: " << best_solution[0] << std::endl;
+                                std::cout << "dy: " << best_solution[1] << std::endl;
+                                std::cout << "dz: " << best_solution[2] << std::endl;
+                                std::cout << "da: " << best_solution[3] << std::endl;
+                                std::cout << "db: " << best_solution[4] << std::endl;
+                                std::cout << "dc: " << best_solution[5] << std::endl;
+
+                                optF = -best_fitness;
+
+                            }
+
+
+                            std::wprintf(L"TIME %d : 랜덤 평행이동 : (%f,%f,%f), 랜덤 회전 : (%f,%f,%f)\n", i, inputVec[0], inputVec[1], inputVec[2], xAngle, yAngle, zAngle);
+
+                            optGraphFunc->myPoints.push_back({ (double)i,optF,0 });
                             delete tgtGyroid;
 
                             size_t firstTimestepPos = str.find("ITEM: TIMESTEP");
@@ -1464,8 +1805,6 @@ int main(int argc, char** argv)
             {
                 for (int atomType = 2; atomType <= 2; atomType++)//원자2만 진행하도록
                 {
-                    const int resolution = 64;
-                    const double BOX_SIZE = 5.22;
                     std::wstring file = L"";
                     std::wprintf(L"데이터가 있는 파일을 선택해주세요.\n");
                     file = openFileDialog();
@@ -1480,139 +1819,155 @@ int main(int argc, char** argv)
                         in.seekg(0, std::ios::beg);
                         in.read(&str[0], size);
                         in.close();
-                        Func* unorderFunc = new Func(funcFlag::scalarField);
-                        unorderFunc->funcType = funcFlag::dim2;
-                        unorderFunc->funcName = L"무질서";
-                        unorderFunc->myColor = col::white;
 
-                        Func* orderFunc = new Func(funcFlag::scalarField);
-                        orderFunc->funcType = funcFlag::dim2;
-                        orderFunc->funcName = L"자이로이드";
-                        orderFunc->myColor = rainbow(0.2);
-                        Func* orderFunc2 = new Func(funcFlag::scalarField);
-                        orderFunc2->funcType = funcFlag::dim2;
-                        orderFunc2->funcName = L"자이로이드2";
-                        orderFunc2->myColor = rainbow(0.4);
-                        Func* orderFunc3 = new Func(funcFlag::scalarField);
-                        orderFunc3->funcType = funcFlag::dim2;
-                        orderFunc3->funcName = L"자이로이드3";
-                        orderFunc3->myColor = rainbow(0.6);
-                        //Func* refGyroid = new Func(funcFlag::scalarField);
-                        //refGyroid->funcType = funcFlag::dim2;
-                        //refGyroid->funcName = L"자이로이드(해석)";
-                        //refGyroid->myColor = rainbow(0);
-                        int i = -1;
+                        Func* gyroidFunc = new Func(funcFlag::scalarField);
+                        gyroidFunc->funcType = funcFlag::dim2;
+                        gyroidFunc->funcName = L"자이로이드";
+                        gyroidFunc->myColor = rainbow(0.2);
+
+
+                        Func* randomFunc = new Func(funcFlag::scalarField);
+                        randomFunc->funcType = funcFlag::dim2;
+                        randomFunc->funcName = L"랜덤";
+                        randomFunc->myColor = { 0xff,0xff,0xff };
+
+                        int i = 0;
                         while (1)
                         {
-                            if (i == -1)
+                            double width = 0.0;
+                            std::size_t box_pos = str.find("BOX BOUNDS");
+                            int number_count = 0;
+
+                            if (box_pos != std::string::npos)
                             {
-                                Func* refGyroid = new Func(funcFlag::scalarField);
-                                refGyroid->funcType = funcFlag::dim2;
-                                refGyroid->funcName = L"자이로이드(해석)";
-                                refGyroid->myColor = rainbow(0.6);
-                                double length = BOX_SIZE/2.0;// / 2.0;
-                                double scaleFactor = 2.0 * M_PI / length;
-                                refGyroid->scalarFunc = [=](double x, double y, double z)->double
-                                    {
-                                        return (std::cos(scaleFactor * x) * std::sin(scaleFactor * y) * std::sin(2 * (scaleFactor * z)) + std::cos(scaleFactor * y) * std::sin(scaleFactor * z) * std::sin(2 * (scaleFactor * x)) + std::cos(scaleFactor * z) * std::sin(scaleFactor * x) * std::sin(2 * (scaleFactor * y)));
-                                    };
-                                refGyroid->latticeConstant = BOX_SIZE;// / 2.0;
-                                const double gDel = 0.7;
-                                for (double x = -BOX_SIZE / 2.0; x <= BOX_SIZE / 2.0; x += gDel)
+                                for (std::size_t i = box_pos; i < str.size(); ++i)
                                 {
-                                    for (double y = -BOX_SIZE / 2.0; y <= BOX_SIZE / 2.0; y += gDel)
+                                    if (isdigit(str[i]) || str[i] == '-' || str[i] == '.')
                                     {
-                                        for (double z = -BOX_SIZE / 2.0; z <= BOX_SIZE / 2.0; z += gDel)
+                                        double temp = std::stod(str.substr(i));
+                                        number_count++;
+
+                                        if (number_count == 2)
                                         {
-                                            if (refGyroid->scalarFunc(x, y, z) >= 0.8) refGyroid->myPoints.push_back({ x, y, z });
+                                            width = temp;
+                                            break;
                                         }
+
+                                        while (i < str.size() && (isdigit(str[i]) || str[i] == '-' || str[i] == '.' || str[i] == 'e' || str[i] == '+'))
+                                            i++;
                                     }
                                 }
-                                std::wprintf(L"만족하는 자이로이드 점의 숫자는 %d개이다.\n", refGyroid->myPoints.size());
-                                refGyroid->scalarCalc();
-                                refGyroid->translation(BOX_SIZE / 2.0, BOX_SIZE / 2.0, BOX_SIZE / 2.0);
                             }
-                            else readTrjString(str, 9, -1, 2, 3, 4, 1, atomType);
+                            std::cout << "Width: " << width << std::endl;
 
+                            readTrjString(str, 9, -1, 2, 3, 4, 1, atomType);
                             Func* tgtGyroid = ((Func*)funcSet[funcSet.size() - 1]);
-                            double length = BOX_SIZE / 2.0;
+                            double length = width / 2;
                             double scaleFactor = 2.0 * M_PI / length;
                             tgtGyroid->scalarFunc = [=](double x, double y, double z)->double
                                 {
                                     return (std::cos(scaleFactor * x) * std::sin(scaleFactor * y) * std::sin(2 * (scaleFactor * z)) + std::cos(scaleFactor * y) * std::sin(scaleFactor * z) * std::sin(2 * (scaleFactor * x)) + std::cos(scaleFactor * z) * std::sin(scaleFactor * x) * std::sin(2 * (scaleFactor * y)));
                                 };
-                            tgtGyroid->latticeConstant = BOX_SIZE;// / 2.0;
-                            tgtGyroid->translation(-BOX_SIZE / 2.0, -BOX_SIZE / 2.0, -BOX_SIZE / 2.0);
+                            tgtGyroid->latticeConstant = width;
+                            tgtGyroid->translation(-width / 2.0, -width / 2.0, -width / 2.0);
                             tgtGyroid->scalarCalc();
-                            double originF = tgtGyroid->scalarSquareAvg();
-                            double xAngle = 0, yAngle = 0, zAngle = 0;
-                            Eigen::Vector3d transVec = { 0,0,0 };
 
-                            //if (i != -1)
-                            //{
-                            //    double lat = tgtGyroid->latticeConstant;
-                            //    transVec = { randomRangeFloat(-lat / 2.0,lat / 2.0),randomRangeFloat(-lat / 2.0,lat / 2.0),randomRangeFloat(-lat / 2.0,lat / 2.0) };
-                            //    tgtGyroid->latticeTranslation(tgtGyroid->myPoints, tgtGyroid->latticeConstant, transVec); //랜덤 평행이동
-                            //    xAngle = randomRangeFloat(0, 360.0);
-                            //    yAngle = randomRangeFloat(0, 360.0);
-                            //    zAngle = randomRangeFloat(0, 360.0);
-                            //    double xRad = xAngle * DEGREE_TO_RADIAN;
-                            //    double yRad = yAngle * DEGREE_TO_RADIAN;
-                            //    double zRad = zAngle * DEGREE_TO_RADIAN;
-                            //    Eigen::Matrix3d rotX, rotY, rotZ;
-                            //    rotX << 1, 0, 0,
-                            //        0, cos(xRad), -sin(xRad),
-                            //        0, sin(xRad), cos(xRad);
-                            //    rotY << cos(yRad), 0, sin(yRad),
-                            //        0, 1, 0,
-                            //        -sin(yRad), 0, cos(yRad);
-                            //    rotZ << cos(zRad), -sin(zRad), 0,
-                            //        sin(zRad), cos(zRad), 0,
-                            //        0, 0, 1;
-                            //    Eigen::Matrix3d inputRot = rotZ * rotY * rotX;
-                            //    tgtGyroid->latticeRotation(tgtGyroid->myPoints, tgtGyroid->latticeConstant, inputRot); //랜덤 회전
-                            //}
-                            if (i == 0 || i == 29 || i == 40 || i == 44 || i == -1)
+                            //Random translation
+                            Eigen::Vector3d inputVec =
                             {
-                                std::wprintf(L"TIME %d : 랜덤 평행이동 : (%f,%f,%f), 랜덤 회전 : (%f,%f,%f)\n", i, transVec[0], transVec[1], transVec[2], xAngle, yAngle, zAngle);
-                                std::vector<std::array<double, 3>> tgtPoints;
-                                for (int i = 0; i < tgtGyroid->myPoints.size(); i++) tgtPoints.push_back({ tgtGyroid->myPoints[i].x,tgtGyroid->myPoints[i].y,tgtGyroid->myPoints[i].z });
-                                double*** density = create3DArray(resolution, resolution, resolution);
-                                createDensityFunction(tgtGyroid->getRawPoints(), BOX_SIZE,density, resolution);
-                                double*** laplacian = createLaplacian(density, resolution, BOX_SIZE);
-                                std::vector<std::array<double, 3>> result = arrayToHistogram(density, resolution, 128);
-                                std::wprintf(L"밀도의 평균은 %lf, 표준편차는 %lf, 왜도는 %lf이다. 면적은 %d이다.\n", arrayToMean(density,resolution), arrayToStdev(density, resolution), arrayToSkewness(density, resolution), densityToSurface(density, resolution, 2.4, 0.05));
+                                randomRangeFloat(-width / 2.0,width / 2.0),
+                                randomRangeFloat(-width / 2.0,width / 2.0),
+                                randomRangeFloat(-width / 2.0,width / 2.0)
+                            };
+                            tgtGyroid->latticeTranslation(tgtGyroid->myPoints, tgtGyroid->latticeConstant, inputVec);
+
+                            double xAngle = randomRangeFloat(0, 360.0);
+                            double yAngle = randomRangeFloat(0, 360.0);
+                            double zAngle = randomRangeFloat(0, 360.0);
+
+                            //Random rotation
+                            double xRad = xAngle * DEGREE_TO_RADIAN;
+                            double yRad = yAngle * DEGREE_TO_RADIAN;
+                            double zRad = zAngle * DEGREE_TO_RADIAN;
+
+                            Eigen::Matrix3d rotX, rotY, rotZ;
+                            rotX << 1, 0, 0,
+                                0, cos(xRad), -sin(xRad),
+                                0, sin(xRad), cos(xRad);
+
+                            rotY << cos(yRad), 0, sin(yRad),
+                                0, 1, 0,
+                                -sin(yRad), 0, cos(yRad);
+
+                            rotZ << cos(zRad), -sin(zRad), 0,
+                                sin(zRad), cos(zRad), 0,
+
+                                0, 0, 1;
+                            Eigen::Matrix3d inputRot = rotZ * rotY * rotX;
+                            tgtGyroid->latticeRotation(tgtGyroid->myPoints, tgtGyroid->latticeConstant, inputRot);
 
 
 
-                                //std::wprintf(L"계산된 w값은 %f이다.\n", calcLaplacianWasserstein(tgtPoints, tgtGyroid->latticeConstant));
-                                for (int j = 0; j < result.size(); j++)
+                            if (i == 0 || i == 200)
+                            {
+                                int resol = 64;
+                                double*** density = create3DArray(resol, resol, resol);
+                                createDensityFunction(tgtGyroid->getRawPoints(), width, density, resol);
+                                double*** deriv2 = createLaplacian(density, resol, width);
+                                double*** deriv3 = createDerivative3(density, resol, width);
+                                double*** deriv4 = createDerivative4(density, resol, width);
+
+                                std::vector<double> dataset;
+                                for (int x = 0; x < resol; x++)
                                 {
-                                    //std::wprintf(L"점 (%f,%f,%f)를 함수에 넣었다.\n", result[j][0], result[j][1], 0);
-                                    if (i == 0) unorderFunc->myPoints.push_back({ result[j][0],result[j][1],0 });
-                                    else if (i == 29) orderFunc->myPoints.push_back({ result[j][0],result[j][1],0 });
-                                    else if (i == 40) orderFunc2->myPoints.push_back({ result[j][0],result[j][1],0 });
-                                    else if (i == 45) orderFunc3->myPoints.push_back({ result[j][0],result[j][1],0 });
-                                    else if (i == -1)
+                                    for (int y = 0; y < resol; y++)
                                     {
-                                        //refGyroid->myPoints.push_back({ result[j][0],result[j][1],0 });
+                                        for (int z = 0; z < resol; z++)
+                                        {
+                                            dataset.push_back(deriv3[x][y][z]);
+                                        }
                                     }
                                 }
+
+                                std::vector<std::array<double,3>> hist = createHistogramSize(dataset, 256);
+
+                                if (i == 0)
+                                {
+                                    for (int j = 0; j < hist.size(); j++)
+                                    {
+                                        randomFunc->myPoints.push_back({ hist[j][0],hist[j][1],hist[j][2] });
+                                    }
+                                }
+                                else if(i==200)
+                                {
+                                    for (int j = 0; j < hist.size(); j++)
+                                    {
+                                        gyroidFunc->myPoints.push_back({ hist[j][0],hist[j][1],hist[j][2] });
+                                    }
+                                }
+
+
+                                free3DArray(density, resol, resol);
+                                free3DArray(deriv2, resol, resol);
+                                free3DArray(deriv3, resol, resol);
+                                free3DArray(deriv4, resol, resol);
                             }
+
+
+
+                            std::wprintf(L"TIME %d : 랜덤 평행이동 : (%f,%f,%f), 랜덤 회전 : (%f,%f,%f)\n", i, inputVec[0], inputVec[1], inputVec[2], xAngle, yAngle, zAngle);
                             delete tgtGyroid;
+
                             size_t firstTimestepPos = str.find("ITEM: TIMESTEP");
                             size_t secondTimestepPos = str.find("ITEM: TIMESTEP", firstTimestepPos + 1);
                             if (secondTimestepPos == std::string::npos) break;
                             else str = str.substr(secondTimestepPos);
-
                             i++;
                         }
                     }
                     else std::wprintf(L"파일을 읽는데 실패하였습니다.\n");
                 }
             }
-
-
             else if (input == 46)
             {
                 int dataIndex = 0;
@@ -1774,7 +2129,9 @@ int main(int argc, char** argv)
         if (state[SDL_SCANCODE_Q]) camY += camSpd;
         if (state[SDL_SCANCODE_E]) camY -= camSpd;
 
-        glClearColor(0.1f, 0.1f, 0.1f, 1.0f);
+        if (darkMode==false) glClearColor(1.0f, 1.0f, 1.0f, 1.0f);
+        else glClearColor(0.1, 0.1f, 0.1f, 1.0f);
+
         glClear(GL_COLOR_BUFFER_BIT | GL_DEPTH_BUFFER_BIT);
         glMatrixMode(GL_PROJECTION);
         glLoadIdentity();
@@ -1791,24 +2148,25 @@ int main(int argc, char** argv)
         if (!camFixX && !camFixMinusX)
         {
             glBegin(GL_LINES);
-            glColor3f(1.0, 0, 0);
+            if (darkMode == true) glColor3f(1.0, 0.0, 0.0);
+            else glColor3f(0.0, 0.0, 0.0);
             glVertex2f(-axisLength / 2.0, 0.0);
             glVertex2f(+axisLength / 2.0, 0.0);
             glEnd();
-
-            glColor3f(1.0, 1.0, 1.0);
             for (float x = -axisLength / 2.0; x <= axisLength / 2.0; x += 1.0) {
                 glBegin(GL_LINES);
                 if (x == 0);
                 else if (fmod(x, 10.0) == 0.0)
                 {
-                    glColor3f(1.0, 0, 0);
+                    if (darkMode == true) glColor3f(1.0, 0.0, 0.0);
+                    else glColor3f(0.0, 0.0, 0.0);
                     glVertex3f(x, -0.4, 0.0);
                     glVertex3f(x, 0.4, 0.0);
                 }
                 else
                 {
-                    glColor3f(1.0, 0, 0);
+                    if (darkMode == true) glColor3f(1.0, 0.0, 0.0);
+                    else glColor3f(0.0, 0.0, 0.0);
                     glVertex3f(x, -0.1, 0.0);
                     glVertex3f(x, 0.1, 0.0);
                 }
@@ -1820,7 +2178,8 @@ int main(int argc, char** argv)
         {
             // y축 그리기
             glBegin(GL_LINES);
-            glColor3f(0.0, 1.0, 0.0);
+            if (darkMode == true) glColor3f(0.0, 1.0, 0.0);
+            else glColor3f(0.0, 0.0, 0.0);
             glVertex3f(0.0, -axisLength / 2.0, 0.0);
             glVertex3f(0.0, +axisLength / 2.0, 0.0);
             glEnd();
@@ -1831,13 +2190,15 @@ int main(int argc, char** argv)
                 if (y == 0);
                 else if (fmod(y, 10.0) == 0.0)
                 {
-                    glColor3f(0.0, 1.0, 0.0);
+                    if (darkMode == true) glColor3f(0.0, 1.0, 0.0);
+                    else glColor3f(0.0, 0.0, 0.0);
                     glVertex3f(-0.4, y, 0.0);
                     glVertex3f(0.4, y, 0.0);
                 }
                 else
                 {
-                    glColor3f(0.0, 1.0, 0.0);
+                    if (darkMode == true) glColor3f(0.0, 1.0, 0.0);
+                    else glColor3f(0.0, 0.0, 0.0);
                     glVertex3f(-0.1, y, 0.0);
                     glVertex3f(0.1, y, 0.0);
                 }
@@ -1849,7 +2210,8 @@ int main(int argc, char** argv)
         {
             // z축 그리기
             glBegin(GL_LINES);
-            glColor3f(0.0, 0.0, 1.0);
+            if(darkMode==true) glColor3f(0.0, 0.0, 1.0);
+            else  glColor3f(0.0, 0.0, 0.0);
             glVertex3f(0.0, 0.0, -axisLength / 2.0);
             glVertex3f(0.0, 0.0, +axisLength / 2.0);
             glEnd();
@@ -1860,13 +2222,15 @@ int main(int argc, char** argv)
                 if (z == 0);
                 else if (fmod(z, 10.0) == 0.0)
                 {
-                    glColor3f(0.0, 0.0, 1.0);
+                    if (darkMode == true) glColor3f(0.0, 0.0, 1.0);
+                    else  glColor3f(0.0, 0.0, 0.0);
                     glVertex3f(0.0, -0.4, z);
                     glVertex3f(0.0, 0.4, z);
                 }
                 else
                 {
-                    glColor3f(0.0, 0.0, 1.0);
+                    if (darkMode == true) glColor3f(0.0, 0.0, 1.0);
+                    else  glColor3f(0.0, 0.0, 0.0);
                     glVertex3f(0.0, -0.1, z);
                     glVertex3f(0.0, 0.1, z);
                 }
@@ -2128,7 +2492,8 @@ int main(int argc, char** argv)
             glPushMatrix();
             glLoadIdentity();
 
-            glColor3f(1.0f, 1.0f, 1.0f);  // 흰색
+            if(darkMode) glColor3f(1.0f, 1.0f, 1.0f);  // 흰색
+            else  glColor3f(0.1f, 0.1f, 0.1f);            
 
             //점
             glPointSize(3.0f);

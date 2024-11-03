@@ -4,6 +4,7 @@
 #include <Eigen/Core>
 #include <unsupported/Eigen/CXX11/Tensor>
 #include <fftw3.h>
+#include <igl/marching_cubes.h>
 
 export module Func;
 
@@ -1452,6 +1453,56 @@ export struct Func
         latticeRotation(myPoints, latticeConstant, getRotationByFFT().inverse());
         latticeTranslation(myPoints, latticeConstant, -getTranslationByFFT());
     }
-
 };
 
+
+
+export std::vector<Triangle> getTrianglesFromScalar(const Eigen::Tensor<double, 3>& scalarField,double isoLevel,double tolerance)
+{
+    const int dimX = scalarField.dimension(0);
+    const int dimY = scalarField.dimension(1);
+    const int dimZ = scalarField.dimension(2);
+
+    Eigen::MatrixXd GV((dimX + 1) * (dimY + 1) * (dimZ + 1), 3);
+    Eigen::VectorXd GS((dimX + 1) * (dimY + 1) * (dimZ + 1));
+
+    for (int z = 0; z <= dimZ; z++) {
+        for (int y = 0; y <= dimY; y++) {
+            for (int x = 0; x <= dimX; x++) {
+                int idx = x + y * (dimX + 1) + z * (dimX + 1) * (dimY + 1);
+                GV.row(idx) << x, y, z;
+                if (x < dimX && y < dimY && z < dimZ) {
+                    GS(idx) = scalarField(x, y, z);
+                }
+            }
+        }
+    }
+
+    for (int i = 0; i < GS.size(); i++) {
+        if (std::abs(GS(i) - isoLevel) > tolerance) {
+            GS(i) = (GS(i) > isoLevel) ? isoLevel + tolerance * 2 : isoLevel - tolerance * 2;
+        }
+    }
+
+    Eigen::MatrixXd V;
+    Eigen::MatrixXi F;
+    igl::marching_cubes(GS, GV, dimX + 1, dimY + 1, dimZ + 1, isoLevel, V, F);
+
+    std::vector<Triangle> triangles;
+    triangles.reserve(F.rows());
+
+    for (int i = 0; i < F.rows(); i++) {
+        Triangle tri;
+        Eigen::Vector3d v1 = V.row(F(i, 0));
+        Eigen::Vector3d v2 = V.row(F(i, 1));
+        Eigen::Vector3d v3 = V.row(F(i, 2));
+
+        tri.p1 = Point(v1.x(), v1.y(), v1.z());
+        tri.p2 = Point(v2.x(), v2.y(), v2.z());
+        tri.p3 = Point(v3.x(), v3.y(), v3.z());
+
+        triangles.push_back(tri);
+    }
+
+    return triangles;
+}

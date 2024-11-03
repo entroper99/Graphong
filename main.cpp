@@ -13,7 +13,7 @@
 #include <iostream>
 #include <fftw3.h>
 #include <pagmo/pagmo.hpp>
-
+#include <unsupported/Eigen/CXX11/Tensor>
 
 import std;
 import globalVar;
@@ -146,94 +146,6 @@ private:
     EvalData data;
 };
 
-
-
-double objective_function(const std::vector<double>& x, std::vector<double>& grad, void* f_data)
-{
-    EvalData* data = static_cast<EvalData*>(f_data);
-
-    double dx = x[0] - data->boxSize * std::floor(x[0] / data->boxSize);
-    double dy = x[1] - data->boxSize * std::floor(x[1] / data->boxSize);
-    double dz = x[2] - data->boxSize * std::floor(x[2] / data->boxSize);
-
-    if (!grad.empty())
-    {
-        grad[0] = 0;
-        grad[1] = 0;
-        grad[2] = 0;
-    }
-
-    double totalVal = 0;
-    double scaleFactor = 2.0 * M_PI / (data->boxSize);
-
-    for (size_t i = 0; i < data->points.size(); i++)
-    {
-        double df_dx = 0.0, df_dy = 0.0, df_dz = 0.0;
-        double xi = data->points[i][0];
-        double yi = data->points[i][1];
-        double zi = data->points[i][2];
-
-        double sx = scaleFactor * (xi + dx);
-        double sy = scaleFactor * (yi + dy);
-        double sz = scaleFactor * (zi + dz);
-
-        double cos_sx = std::cos(sx);
-        double sin_sx = std::sin(sx);
-        double cos_sy = std::cos(sy);
-        double sin_sy = std::sin(sy);
-        double cos_sz = std::cos(sz);
-        double sin_sz = std::sin(sz);
-
-        double sin_2sx = std::sin(2 * sx);
-        double cos_2sx = std::cos(2 * sx);
-        double sin_2sy = std::sin(2 * sy);
-        double cos_2sy = std::cos(2 * sy);
-        double sin_2sz = std::sin(2 * sz);
-        double cos_2sz = std::cos(2 * sz);
-
-        totalVal += (cos_sx * sin_sy * sin_2sz +
-            cos_sy * sin_sz * sin_2sx +
-            cos_sz * sin_sx * sin_2sy);
-
-        df_dx = -scaleFactor * sin_sx * sin_sy * sin_2sz +
-            2 * scaleFactor * cos_sy * sin_sz * cos_2sx +
-            scaleFactor * cos_sz * cos_sx * sin_2sy;
-
-        df_dy = scaleFactor * cos_sx * cos_sy * sin_2sz -
-            scaleFactor * sin_sy * sin_sz * sin_2sx +
-            2 * scaleFactor * cos_sz * sin_sx * cos_2sy;
-
-        df_dz = 2 * scaleFactor * cos_sx * sin_sy * cos_2sz +
-            scaleFactor * cos_sy * cos_sz * sin_2sx -
-            scaleFactor * sin_sz * sin_sx * sin_2sy;
-
-        if (!grad.empty())
-        {
-            grad[0] += df_dx;
-            grad[1] += df_dy;
-            grad[2] += df_dz;
-        }
-    }
-
-    double fx = totalVal / static_cast<double>(data->points.size());
-
-    if (!grad.empty())
-    {
-        grad[0] /= static_cast<double>(data->points.size());
-        grad[1] /= static_cast<double>(data->points.size());
-        grad[2] /= static_cast<double>(data->points.size());
-
-        // 최대화를 위해 함수 값과 그래디언트를 음수로 만듭니다.
-        grad[0] = -grad[0];
-        grad[1] = -grad[1];
-        grad[2] = -grad[2];
-    }
-
-    data->counter++;
-
-    // 최대화를 위해 함수 값을 음수로 반환합니다.
-    return -fx;
-}
 
 int main(int argc, char** argv)
 {
@@ -2032,18 +1944,21 @@ int main(int argc, char** argv)
                 //std::wprintf(L"해상도를 몇으로 할까?\n");
                 //std::cin >> resolution;
 
-                std::vector<Point> pts = ((Func*)funcSet[dataIndex])->myPoints;
+                Func* lastFunc = ((Func*)funcSet[dataIndex]);
+
+                std::vector<Point> pts = lastFunc->myPoints;
                 std::vector<std::array<double, 3>> dPts;
                 for (int i = 0; i < pts.size(); i++) dPts.push_back({ pts[i].x,pts[i].y,pts[i].z });
 
-                double period = ((Func*)funcSet[dataIndex])->latticeConstant;
+                double period = 4.942;
                 double*** density = create3DArray(resolution, resolution, resolution);
                 createDensityFunction(dPts, period, density, resolution);
 
-                ((Func*)funcSet[dataIndex])->funcType = funcFlag::dim3;
-                ((Func*)funcSet[dataIndex])->myColor = col::white;
 
-                ((Func*)funcSet[dataIndex])->myPoints.clear();
+                lastFunc->funcType = funcFlag::dim3;
+                lastFunc->myColor = col::white;
+
+                lastFunc->myPoints.clear();
                 int pointNumber = 0;
                 for (int x = 0; x < resolution; x++)
                 {
@@ -2053,14 +1968,26 @@ int main(int argc, char** argv)
                         {
                             if (density[x][y][z] > cutoff - tolerance && density[x][y][z] < cutoff + tolerance)
                             {
-                                ((Func*)funcSet[dataIndex])->myPoints.push_back({ (double)x - (double)resolution / 2.0,(double)y - (double)resolution / 2.0,(double)z - (double)resolution / 2.0 });
+                                lastFunc->myPoints.push_back({ (double)x - (double)resolution / 2.0,(double)y - (double)resolution / 2.0,(double)z - (double)resolution / 2.0 });
                                 pointNumber++;
                             }
                         }
                     }
                 }
-                std::wprintf(L"%d/%d의 점들이 입력되었다.\n", pointNumber, resolution * resolution * resolution);
 
+                Eigen::Tensor<double, 3> densityTensor(resolution, resolution, resolution);
+                for (int i = 0; i < resolution; ++i)
+                {
+                    for (int j = 0; j < resolution; ++j)
+                    {
+                        for (int k = 0; k < resolution; ++k)
+                        {
+                            densityTensor(i, j, k) = density[i][j][k];
+                        }
+                    }
+                }
+                lastFunc->triangles = getTrianglesFromScalar(densityTensor, 2.3, 0.05);
+                std::wprintf(L"%d/%d의 점들이 입력되었다.\n", pointNumber, resolution * resolution * resolution);
             }
 
 

@@ -114,8 +114,8 @@
     <Link>
       <SubSystem>Console</SubSystem>
       <GenerateDebugInformation>true</GenerateDebugInformation>
-      <AdditionalLibraryDirectories>C:\SDL\SDL2-2.0.14\lib\x64;C:\SDL\SDL2_image-2.0.5\lib\x64;C:\SDL\SDL2_ttf-2.0.15\lib\x64;C:\SDL\SDL2_mixer-2.0.4\lib\x64;C:\lib\glew\lib\Debug\x64;C:\lib\fftw-3.3.5-dll64;C:\OpenXLSX-0.3.2\build\output\Debug;C:\liblbfgs-master\build\Debug;C:\nlopt-2.8.0\build\Debug;C:\vcpkg\installed\x64-windows\lib</AdditionalLibraryDirectories>
-      <AdditionalDependencies>SDL2.lib;SDL2main.lib;SDL2test.lib;SDL2_image.lib;SDL2_mixer.lib;SDL2_ttf.lib;glew32d.lib;glew32sd.lib;opengl32.lib;glu32.lib;libfftw3l-3.lib;libfftw3-3.lib;libfftw3f-3.lib;OpenXLSXd.lib;lbfgsd.lib;nlopt.lib;glog.lib;%(AdditionalDependencies)</AdditionalDependencies>
+      <AdditionalLibraryDirectories>C:\SDL\SDL2-2.0.14\lib\x64;C:\SDL\SDL2_image-2.0.5\lib\x64;C:\SDL\SDL2_ttf-2.0.15\lib\x64;C:\SDL\SDL2_mixer-2.0.4\lib\x64;C:\lib\glew\lib\Debug\x64;C:\lib\fftw-3.3.5-dll64;C:\OpenXLSX-0.3.2\build\output\Debug;C:\liblbfgs-master\build\Debug;C:\nlopt-2.8.0\build\Debug</AdditionalLibraryDirectories>
+      <AdditionalDependencies>SDL2.lib;SDL2main.lib;SDL2test.lib;SDL2_image.lib;SDL2_mixer.lib;SDL2_ttf.lib;glew32d.lib;glew32sd.lib;opengl32.lib;glu32.lib;libfftw3l-3.lib;libfftw3-3.lib;libfftw3f-3.lib;OpenXLSXd.lib;lbfgsd.lib;nlopt.lib;%(AdditionalDependencies)</AdditionalDependencies>
     </Link>
   </ItemDefinitionGroup>
   <ItemDefinitionGroup Condition="'$(Configuration)|$(Platform)'=='Release|x64'">

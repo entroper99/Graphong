@@ -1456,24 +1456,21 @@ export struct Func
 };
 
 
-
-export std::vector<Triangle> getTrianglesFromScalar(const Eigen::Tensor<double, 3>& scalarField,double isoLevel,double tolerance)
+export std::vector<Triangle> getTrianglesFromScalar(const Eigen::Tensor<double, 3>& scalarField, double isoLevel, double tolerance)
 {
     const int dimX = scalarField.dimension(0);
     const int dimY = scalarField.dimension(1);
     const int dimZ = scalarField.dimension(2);
 
-    Eigen::MatrixXd GV((dimX + 1) * (dimY + 1) * (dimZ + 1), 3);
-    Eigen::VectorXd GS((dimX + 1) * (dimY + 1) * (dimZ + 1));
+    Eigen::MatrixXd GV(dimX * dimY * dimZ, 3);
+    Eigen::VectorXd GS(dimX * dimY * dimZ);
 
-    for (int z = 0; z <= dimZ; z++) {
-        for (int y = 0; y <= dimY; y++) {
-            for (int x = 0; x <= dimX; x++) {
-                int idx = x + y * (dimX + 1) + z * (dimX + 1) * (dimY + 1);
+    for (int z = 0; z < dimZ; z++) {
+        for (int y = 0; y < dimY; y++) {
+            for (int x = 0; x < dimX; x++) {
+                int idx = x + y * dimX + z * dimX * dimY;
                 GV.row(idx) << x, y, z;
-                if (x < dimX && y < dimY && z < dimZ) {
-                    GS(idx) = scalarField(x, y, z);
-                }
+                GS(idx) = scalarField(x, y, z);
             }
         }
     }
@@ -1486,7 +1483,7 @@ export std::vector<Triangle> getTrianglesFromScalar(const Eigen::Tensor<double, 
 
     Eigen::MatrixXd V;
     Eigen::MatrixXi F;
-    igl::marching_cubes(GS, GV, dimX + 1, dimY + 1, dimZ + 1, isoLevel, V, F);
+    igl::marching_cubes(GS, GV, dimX, dimY, dimZ, isoLevel, V, F);
 
     std::vector<Triangle> triangles;
     triangles.reserve(F.rows());
@@ -1505,4 +1502,11 @@ export std::vector<Triangle> getTrianglesFromScalar(const Eigen::Tensor<double, 
     }
 
     return triangles;
+}
+
+export double getAreaFromTriangles(const std::vector<Triangle>& triangles)
+{
+    double totalArea = 0.0;
+    for (const auto& triangle : triangles) totalArea += triangle.getArea();
+    return totalArea;
 }

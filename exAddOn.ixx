@@ -433,8 +433,107 @@ export std::vector<std::array<double, 3>> createHistogramSize(const std::vector<
     return createHistogramDel(inputDataset, del);
 }
 
-
-
-
-
-
+//export struct Point
+//{
+//    double x, y, z;
+//
+//    bool operator==(const Point& other) const
+//    {
+//        return x == other.x && y == other.y && z == other.z;
+//    }
+//
+//    double distance(const Point& other) const
+//    {
+//        double dx = x - other.x;
+//        double dy = y - other.y;
+//        double dz = z - other.z;
+//        return std::sqrt(dx * dx + dy * dy + dz * dz);
+//    }
+//};
+//
+//export struct Triangle
+//{
+//    Point p1, p2, p3;
+//
+//    bool operator==(const Triangle& other) const
+//    {
+//        return (p1 == other.p1 || p1 == other.p2 || p1 == other.p3) &&
+//            (p2 == other.p1 || p2 == other.p2 || p2 == other.p3) &&
+//            (p3 == other.p1 || p3 == other.p2 || p3 == other.p3);
+//    }
+//
+//    double getArea() const
+//    {
+//        double a = p1.distance(p2);
+//        double b = p2.distance(p3);
+//        double c = p3.distance(p1);
+//        double s = (a + b + c) / 2.0;
+//        return std::sqrt(s * (s - a) * (s - b) * (s - c));
+//    }
+//
+//    bool containsPoint(const Point& p) const
+//    {
+//        double totalArea = getArea();
+//        double subArea1 = Triangle{ p, p2, p3 }.getArea();
+//        double subArea2 = Triangle{ p1, p, p3 }.getArea();
+//        double subArea3 = Triangle{ p1, p2, p }.getArea();
+//        double sum = subArea1 + subArea2 + subArea3;
+//        return std::abs(totalArea - sum) < 1e-6;
+//    }
+//};
+//
+//
+//export std::vector<Triangle> getTrianglesFromScalar(const Eigen::Tensor<double, 3>& scalarField, double isoLevel, double tolerance)
+//{
+//    const int dimX = scalarField.dimension(0);
+//    const int dimY = scalarField.dimension(1);
+//    const int dimZ = scalarField.dimension(2);
+//
+//    Eigen::MatrixXd GV(dimX * dimY * dimZ, 3);
+//    Eigen::VectorXd GS(dimX * dimY * dimZ);
+//
+//    for (int z = 0; z < dimZ; z++) {
+//        for (int y = 0; y < dimY; y++) {
+//            for (int x = 0; x < dimX; x++) {
+//                int idx = x + y * dimX + z * dimX * dimY;
+//                GV.row(idx) << x, y, z;
+//                GS(idx) = scalarField(x, y, z);
+//            }
+//        }
+//    }
+//
+//    for (int i = 0; i < GS.size(); i++) {
+//        if (std::abs(GS(i) - isoLevel) > tolerance) {
+//            GS(i) = (GS(i) > isoLevel) ? isoLevel + tolerance * 2 : isoLevel - tolerance * 2;
+//        }
+//    }
+//
+//    Eigen::MatrixXd V;
+//    Eigen::MatrixXi F;
+//    igl::marching_cubes(GS, GV, dimX, dimY, dimZ, isoLevel, V, F);
+//
+//    std::vector<Triangle> triangles;
+//    triangles.reserve(F.rows());
+//
+//    for (int i = 0; i < F.rows(); i++) {
+//        Triangle tri;
+//        Eigen::Vector3d v1 = V.row(F(i, 0));
+//        Eigen::Vector3d v2 = V.row(F(i, 1));
+//        Eigen::Vector3d v3 = V.row(F(i, 2));
+//
+//        tri.p1 = Point(v1.x(), v1.y(), v1.z());
+//        tri.p2 = Point(v2.x(), v2.y(), v2.z());
+//        tri.p3 = Point(v3.x(), v3.y(), v3.z());
+//
+//        triangles.push_back(tri);
+//    }
+//
+//    return triangles;
+//}
+//
+//export double getAreaFromTriangles(const std::vector<Triangle>& triangles)
+//{
+//    double totalArea = 0.0;
+//    for (const auto& triangle : triangles) totalArea += triangle.getArea();
+//    return totalArea;
+//}

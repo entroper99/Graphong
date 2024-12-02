@@ -1,22 +1,51 @@
+#include <Eigen/Dense>
+
 export module Shapes;
 
 import std;
 
-export struct Point
-{
+export struct Point {
     double x, y, z;
 
-    bool operator==(const Point& other) const
-    {
-        return x == other.x && y == other.y && z == other.z;
+    // 생성자
+    Point() : x(0), y(0), z(0) {}
+    Point(double x_, double y_, double z_) : x(x_), y(y_), z(z_) {}
+
+    Point(std::initializer_list<double> init_list) {
+        auto it = init_list.begin();
+        x = (it != init_list.end()) ? *it++ : 0.0;
+        y = (it != init_list.end()) ? *it++ : 0.0;
+        z = (it != init_list.end()) ? *it++ : 0.0;
     }
 
-    double distance(const Point& other) const
-    {
-        double dx = x - other.x;
-        double dy = y - other.y;
-        double dz = z - other.z;
-        return std::sqrt(dx * dx + dy * dy + dz * dz);
+    // 비교 연산자
+    bool operator==(const Point& other) const {
+        constexpr double epsilon = 1e-6;
+        return std::abs(x - other.x) < epsilon &&
+            std::abs(y - other.y) < epsilon &&
+            std::abs(z - other.z) < epsilon;
+    }
+
+    // 두 점 사이의 거리 계산
+    double distance(const Point& other) const {
+        return std::sqrt((x - other.x) * (x - other.x) +
+            (y - other.y) * (y - other.y) +
+            (z - other.z) * (z - other.z));
+    }
+
+    // Eigen Vector3d로 변환
+    Eigen::Vector3d toVector() const {
+        return Eigen::Vector3d(x, y, z);
+    }
+
+    bool operator<(const Point& other) const {
+        if (x != other.x) return x < other.x;
+        if (y != other.y) return y < other.y;
+        return z < other.z;
+    }
+
+    bool operator>(const Point& other) const {
+        return other < *this; // Use the existing < operator
     }
 };
 
@@ -28,34 +57,48 @@ export auto pointHash = [](const Point& p) -> std::size_t
         return hx ^ (hy << 1) ^ (hz << 2);
     };
 
-export struct Triangle
-{
+export struct Triangle {
     Point p1, p2, p3;
 
-    bool operator==(const Triangle& other) const
-    {
-        return (p1 == other.p1 || p1 == other.p2 || p1 == other.p3) &&
-            (p2 == other.p1 || p2 == other.p2 || p2 == other.p3) &&
-            (p3 == other.p1 || p3 == other.p2 || p3 == other.p3);
+    bool operator==(const Triangle& other) const {
+        std::vector<Point> points1 = { p1, p2, p3 };
+        std::vector<Point> points2 = { other.p1, other.p2, other.p3 };
+        std::sort(points1.begin(), points1.end(), [](const Point& a, const Point& b) {
+            if (a.x != b.x) return a.x < b.x;
+            if (a.y != b.y) return a.y < b.y;
+            return a.z < b.z;
+            });
+        std::sort(points2.begin(), points2.end(), [](const Point& a, const Point& b) {
+            if (a.x != b.x) return a.x < b.x;
+            if (a.y != b.y) return a.y < b.y;
+            return a.z < b.z;
+            });
+        return points1 == points2;
     }
 
-    double getArea() const
-    {
-        double a = p1.distance(p2);
-        double b = p2.distance(p3);
-        double c = p3.distance(p1);
-        double s = (a + b + c) / 2.0;
-        return std::sqrt(s * (s - a) * (s - b) * (s - c));
+    double getArea() const {
+        Eigen::Vector3d v0 = p1.toVector();
+        Eigen::Vector3d v1 = p2.toVector();
+        Eigen::Vector3d v2 = p3.toVector();
+        Eigen::Vector3d crossProduct = (v1 - v0).cross(v2 - v0);
+        return 0.5 * crossProduct.norm();
     }
 
-    bool containsPoint(const Point& p) const
-    {
+    bool containsPoint(const Point& p) const {
         double totalArea = getArea();
         double subArea1 = Triangle{ p, p2, p3 }.getArea();
         double subArea2 = Triangle{ p1, p, p3 }.getArea();
         double subArea3 = Triangle{ p1, p2, p }.getArea();
         double sum = subArea1 + subArea2 + subArea3;
         return std::abs(totalArea - sum) < 1e-6;
+    }
+
+    Eigen::Vector3d getNormal() const {
+        Eigen::Vector3d v0 = p1.toVector();
+        Eigen::Vector3d v1 = p2.toVector();
+        Eigen::Vector3d v2 = p3.toVector();
+        Eigen::Vector3d normal = (v1 - v0).cross(v2 - v0);
+        return normal.normalized();
     }
 };
 

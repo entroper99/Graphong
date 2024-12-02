@@ -292,6 +292,7 @@ int main(int argc, char** argv)
             std::wprintf(L"\033[0;33m47. 결정구조 밀도함수 변환 및 면적 계산\033[0m\n");
             std::wprintf(L"\033[0;33m48. 회전 평행이동 테스트 : 표면적 vs 함수\033[0m\n");
             std::wprintf(L"\033[0;33m49. 고밀도 부분 추출\033[0m\n");
+            std::wprintf(L"\033[0;33m50. 회전 평행이동 테스트 : 디리클레에너지 vs 함수\033[0m\n");
             std::wprintf(L"------------------▼아래에 값 입력-----------------\n");
 
             int input = 0;
@@ -1010,18 +1011,47 @@ int main(int argc, char** argv)
                 std::wprintf(L"데이터가 있는 파일을 선택해주세요.\n");
                 file = openFileDialog();
                 std::wprintf(L"파일 %ls 를 대상으로 설정하였다.\n", file.c_str());
-                std::wifstream in(file);
-
-
-                double boxSize = 4.906;//BOX_SIZE;
-
+                std::ifstream in(file);
                 if (in.is_open())
                 {
+                    std::string str;
+                    in.seekg(0, std::ios::end);
+                    size_t size = in.tellg();
+                    str.resize(size);
+                    in.seekg(0, std::ios::beg);
+                    in.read(&str[0], size);
+                    in.close();
+
+                    double width = 0.0;
+                    std::size_t box_pos = str.find("BOX BOUNDS");
+                    int number_count = 0;
+                    if (box_pos != std::string::npos)
+                    {
+                        for (std::size_t i = box_pos; i < str.size(); ++i)
+                        {
+                            if (isdigit(str[i]) || str[i] == '-' || str[i] == '.')
+                            {
+                                double temp = std::stod(str.substr(i));
+                                number_count++;
+
+                                if (number_count == 2)
+                                {
+                                    width = temp;
+                                    break;
+                                }
+
+                                while (i < str.size() && (isdigit(str[i]) || str[i] == '-' || str[i] == '.' || str[i] == 'e' || str[i] == '+'))
+                                    i++;
+                            }
+                        }
+                    }
+                    std::cout << "Width: " << width << std::endl;
+
                     readTrjFile(file, 9, -1, 2, 3, 4, 1, 2);
                     Func* tgtFunc = ((Func*)funcSet[funcSet.size() - 1]);
+                    tgtFunc->latticeConstant = width;// / 2.0;
                     tgtFunc->scalarCalc();
-                    tgtFunc->latticeConstant = boxSize;// / 2.0;
-                    tgtFunc->translation(-boxSize / 2.0, -boxSize / 2.0, -boxSize / 2.0);
+                    tgtFunc->translation(-width / 2.0, -width / 2.0, -width / 2.0);
                 }
                 else std::wprintf(L"파일을 읽는데 실패하였습니다.\n");
             }
@@ -1478,7 +1508,6 @@ int main(int argc, char** argv)
                             double width = 0.0;
                             std::size_t box_pos = str.find("BOX BOUNDS");
                             int number_count = 0;
-
                             if (box_pos != std::string::npos)
                             {
                                 for (std::size_t i = box_pos; i < str.size(); ++i)
@@ -1952,9 +1981,8 @@ int main(int argc, char** argv)
                 std::vector<std::array<double, 3>> dPts;
                 for (int i = 0; i < pts.size(); i++) dPts.push_back({ pts[i].x,pts[i].y,pts[i].z });
 
-                double period = 4.942;
                 double*** density = create3DArray(resolution, resolution, resolution);
-                createDensityFunction(dPts, period, density, resolution);
+                createDensityFunction(dPts, lastFunc->latticeConstant, density, resolution);
 
 
                 lastFunc->funcType = funcFlag::dim3;
@@ -1977,6 +2005,10 @@ int main(int argc, char** argv)
                     }
                 }
 
+                double energy = getDirichletEnergy(density,resolution, (lastFunc->latticeConstant)*(lastFunc->latticeConstant)*(lastFunc->latticeConstant));
+                std::wprintf(L"이 밀도함수의 디리클레 에너지는 %lf이다.\n", energy);
+
+
                 Eigen::Tensor<double, 3> densityTensor(resolution, resolution, resolution);
                 for (int i = 0; i < resolution; ++i)
                 {
@@ -1990,7 +2022,12 @@ int main(int argc, char** argv)
                 }
                 lastFunc->triangles = getTrianglesFromScalar(densityTensor, 1.95, 0.05);
                 double surfaceArea = getAreaFromTriangles(lastFunc->triangles);
+                calculateAndAnalyzeCurvature(lastFunc->triangles);
                 std::wprintf(L"이 밀도함수의 표면적은 %lf이다.\n", surfaceArea);
+                auto adjacencyList = buildAdjacencyList(lastFunc->triangles);
+                auto largestSurf = getLargestSurfaces(lastFunc->triangles, adjacencyList);
+                std::wprintf(L"가장 큰 곡면의 넓이는 %lf이고 두번째로 큰 곡면의 넓이는 %lf이다.\n", largestSurf.first, largestSurf.second);
+
 
                 std::wprintf(L"%d/%d의 점들이 입력되었다.\n", pointNumber, resolution * resolution * resolution);
             }
@@ -2122,7 +2159,8 @@ int main(int argc, char** argv)
                                     }
                                 }
                             }
-                            double surfaceArea = getAreaFromTriangles(getTrianglesFromScalar(densityTensor, 1.95, 0.05));
+                            std::vector<Triangle> triSet = getTrianglesFromScalar(densityTensor, 1.95, 0.05);
+                            double surfaceArea = getAreaFromTriangles(triSet);
 
                             surfaceFunc->myPoints.push_back({ (double)i,surfaceArea,0 });
                             delete tgtGyroid;
@@ -2180,6 +2218,140 @@ int main(int argc, char** argv)
                 }
 
             }
+            else if (input == 50)
+            {
+                for (int atomType = 2; atomType <= 2; atomType++)//원자2만 진행하도록
+                {
+                    std::wstring file = L"";
+                    std::wprintf(L"데이터가 있는 파일을 선택해주세요.\n");
+                    file = openFileDialog();
+                    std::wprintf(L"파일 %ls 를 대상으로 설정하였다.\n", file.c_str());
+                    std::ifstream in(file);
+                    if (in.is_open())
+                    {
+                        std::string str;
+                        in.seekg(0, std::ios::end);
+                        size_t size = in.tellg();
+                        str.resize(size);
+                        in.seekg(0, std::ios::beg);
+                        in.read(&str[0], size);
+                        in.close();
+
+
+                        Func* energyFunc = new Func(funcFlag::scalarField);
+                        energyFunc->funcType = funcFlag::dim2;
+                        energyFunc->funcName = L"디리클레 에너지";
+                        std::wprintf(L"세번째 F_avg의 색을 뭘로 할까?\n");
+                        energyFunc->myColor = rainbow(0.3);
+
+
+                        Func* originGraphFunc = new Func(funcFlag::scalarField);
+                        originGraphFunc->funcType = funcFlag::dim2;
+                        originGraphFunc->funcName = L"원본 F값";
+                        std::wprintf(L"원본 F_avg의 색을 뭘로 할까?\n");
+                        originGraphFunc->myColor = { 0xff,0xff,0xff };
+
+                        int i = 0;
+                        while (1)
+                        {
+                            double width = 0.0;
+                            std::size_t box_pos = str.find("BOX BOUNDS");
+                            int number_count = 0;
+
+                            if (box_pos != std::string::npos)
+                            {
+                                for (std::size_t i = box_pos; i < str.size(); ++i)
+                                {
+                                    if (isdigit(str[i]) || str[i] == '-' || str[i] == '.')
+                                    {
+                                        double temp = std::stod(str.substr(i));
+                                        number_count++;
+
+                                        if (number_count == 2)
+                                        {
+                                            width = temp;
+                                            break;
+                                        }
+
+                                        while (i < str.size() && (isdigit(str[i]) || str[i] == '-' || str[i] == '.' || str[i] == 'e' || str[i] == '+'))
+                                            i++;
+                                    }
+                                }
+                            }
+                            std::cout << "Width: " << width << std::endl;
+
+                            readTrjString(str, 9, -1, 2, 3, 4, 1, atomType);
+                            Func* tgtGyroid = ((Func*)funcSet[funcSet.size() - 1]);
+                            double length = width;
+                            double scaleFactor = 4.0 * M_PI / length;
+                            tgtGyroid->scalarFunc = [=](double x, double y, double z)->double
+                                {
+                                    return (std::cos(scaleFactor * x) * std::sin(scaleFactor * y) * std::sin(2 * (scaleFactor * z)) + std::cos(scaleFactor * y) * std::sin(scaleFactor * z) * std::sin(2 * (scaleFactor * x)) + std::cos(scaleFactor * z) * std::sin(scaleFactor * x) * std::sin(2 * (scaleFactor * y)));
+                                };
+                            tgtGyroid->latticeConstant = width;
+                            tgtGyroid->translation(-width / 2.0, -width / 2.0, -width / 2.0);
+                            tgtGyroid->scalarCalc();
+                            originGraphFunc->myPoints.push_back({ (double)i,tgtGyroid->scalarSquareAvg(),0 });
+
+                            double originF = tgtGyroid->scalarSquareAvg();
+
+                            //Random translation
+                            Eigen::Vector3d inputVec =
+                            {
+                                randomRangeFloat(-width / 2.0,width / 2.0),
+                                randomRangeFloat(-width / 2.0,width / 2.0),
+                                randomRangeFloat(-width / 2.0,width / 2.0)
+                            };
+                            tgtGyroid->latticeTranslation(tgtGyroid->myPoints, tgtGyroid->latticeConstant, inputVec);
+
+                            double xAngle = randomRangeFloat(0, 360.0);
+                            double yAngle = randomRangeFloat(0, 360.0);
+                            double zAngle = randomRangeFloat(0, 360.0);
+
+                            //Random rotation
+                            double xRad = xAngle * DEGREE_TO_RADIAN;
+                            double yRad = yAngle * DEGREE_TO_RADIAN;
+                            double zRad = zAngle * DEGREE_TO_RADIAN;
+
+                            Eigen::Matrix3d rotX, rotY, rotZ;
+                            rotX << 1, 0, 0,
+                                0, cos(xRad), -sin(xRad),
+                                0, sin(xRad), cos(xRad);
+
+                            rotY << cos(yRad), 0, sin(yRad),
+                                0, 1, 0,
+                                -sin(yRad), 0, cos(yRad);
+
+                            rotZ << cos(zRad), -sin(zRad), 0,
+                                sin(zRad), cos(zRad), 0,
+
+                                0, 0, 1;
+                            Eigen::Matrix3d inputRot = rotZ * rotY * rotX;
+                            tgtGyroid->latticeRotation(tgtGyroid->myPoints, tgtGyroid->latticeConstant, inputRot);
+
+
+                            std::wprintf(L"TIME %d : 랜덤 평행이동 : (%f,%f,%f), 랜덤 회전 : (%f,%f,%f)\n", i, inputVec[0], inputVec[1], inputVec[2], xAngle, yAngle, zAngle);
+                            const int resol = 32;
+
+                            double*** density = create3DArray(resol, resol, resol);
+                            createDensityFunction(tgtGyroid->getRawPoints(), width, density, resol);
+
+                            double energy = getDirichletEnergy(density, resol, width * width * width);
+
+                            energyFunc->myPoints.push_back({ (double)i,energy,0 });
+                            delete tgtGyroid;
+                            free3DArray(density, resol, resol);
+
+                            size_t firstTimestepPos = str.find("ITEM: TIMESTEP");
+                            size_t secondTimestepPos = str.find("ITEM: TIMESTEP", firstTimestepPos + 1);
+                            if (secondTimestepPos == std::string::npos) break;
+                            else str = str.substr(secondTimestepPos);
+                            i++;
+                        }
+                    }
+                    else std::wprintf(L"파일을 읽는데 실패하였습니다.\n");
+                }
+                }
 
 
 

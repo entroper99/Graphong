@@ -1510,3 +1510,281 @@ export double getAreaFromTriangles(const std::vector<Triangle>& triangles)
     for (const auto& triangle : triangles) totalArea += triangle.getArea();
     return totalArea;
 }
+
+struct PointHasher 
+{
+    std::size_t operator()(const Point& p) const 
+    {
+        return std::hash<double>()(p.x) ^ std::hash<double>()(p.y) ^ std::hash<double>()(p.z);
+    }
+};
+
+export std::vector<double> getMeanCurvatures(const std::vector<Triangle>& inputTriangles) 
+{
+    std::unordered_map<Point, int, PointHasher> pointToIndex;
+    std::vector<Point> indexToPoint;
+    int index = 0;
+    for (const auto& tri : inputTriangles) {
+        if (pointToIndex.find(tri.p1) == pointToIndex.end()) {
+            pointToIndex[tri.p1] = index++;
+            indexToPoint.push_back(tri.p1);
+        }
+        if (pointToIndex.find(tri.p2) == pointToIndex.end()) {
+            pointToIndex[tri.p2] = index++;
+            indexToPoint.push_back(tri.p2);
+        }
+        if (pointToIndex.find(tri.p3) == pointToIndex.end()) {
+            pointToIndex[tri.p3] = index++;
+            indexToPoint.push_back(tri.p3);
+        }
+    }
+
+    int numVertices = indexToPoint.size();
+    std::vector<Eigen::Vector3d> meanCurvatureVectors(numVertices, Eigen::Vector3d::Zero());
+    std::vector<double> vertexAreas(numVertices, 0.0);
+    std::vector<std::vector<int>> vertexTriangles(numVertices);
+
+    for (int i = 0; i < inputTriangles.size(); ++i) {
+        const auto& tri = inputTriangles[i];
+        int idx1 = pointToIndex[tri.p1];
+        int idx2 = pointToIndex[tri.p2];
+        int idx3 = pointToIndex[tri.p3];
+
+        vertexTriangles[idx1].push_back(i);
+        vertexTriangles[idx2].push_back(i);
+        vertexTriangles[idx3].push_back(i);
+    }
+
+    std::vector<std::vector<std::pair<int, int>>> vertexEdges(numVertices);
+
+    std::map<std::pair<int, int>, std::vector<int>> edgeToTriangles;
+    for (int i = 0; i < inputTriangles.size(); ++i) 
+    {
+        const auto& tri = inputTriangles[i];
+        int idx[3] = { pointToIndex[tri.p1], pointToIndex[tri.p2], pointToIndex[tri.p3] };
+
+        for (int j = 0; j < 3; ++j) {
+            int idx1 = idx[j];
+            int idx2 = idx[(j + 1) % 3];
+            if (idx1 > idx2) std::swap(idx1, idx2);
+            edgeToTriangles[{idx1, idx2}].push_back(i);
+        }
+    }
+
+    for (const auto& edgePair : edgeToTriangles) 
+    {
+        int idx1 = edgePair.first.first;
+        int idx2 = edgePair.first.second;
+        const std::vector<int>& adjacentTriangles = edgePair.second;
+
+        Eigen::Vector3d vi = indexToPoint[idx1].toVector();
+        Eigen::Vector3d vj = indexToPoint[idx2].toVector();
+
+        double cotAlpha = 0.0, cotBeta = 0.0;
+
+        if (adjacentTriangles.size() == 2) {
+            const Triangle& tri1 = inputTriangles[adjacentTriangles[0]];
+            const Triangle& tri2 = inputTriangles[adjacentTriangles[1]];
+
+            int idx3_1 = -1, idx3_2 = -1;
+            for (int idx : { pointToIndex[tri1.p1], pointToIndex[tri1.p2], pointToIndex[tri1.p3] }) 
+            {
+                if (idx != idx1 && idx != idx2) 
+                {
+                    idx3_1 = idx;
+                    break;
+                }
+            }
+            for (int idx : { pointToIndex[tri2.p1], pointToIndex[tri2.p2], pointToIndex[tri2.p3] }) 
+            {
+                if (idx != idx1 && idx != idx2) 
+                {
+                    idx3_2 = idx;
+                    break;
+                }
+            }
+
+            Eigen::Vector3d vk = indexToPoint[idx3_1].toVector();
+            Eigen::Vector3d vl = indexToPoint[idx3_2].toVector();
+
+            Eigen::Vector3d e_ij = vi - vj;
+            Eigen::Vector3d e_ik = vi - vk;
+            Eigen::Vector3d e_jk = vj - vk;
+            Eigen::Vector3d e_il = vi - vl;
+            Eigen::Vector3d e_jl = vj - vl;
+
+            double angleOpposite_Alpha = std::acos(e_jk.dot(-e_ik) / (e_jk.norm() * e_ik.norm()));
+            double angleOpposite_Beta = std::acos(e_jl.dot(-e_il) / (e_jl.norm() * e_il.norm()));
+
+            cotAlpha = 1.0 / std::tan(angleOpposite_Alpha);
+            cotBeta = 1.0 / std::tan(angleOpposite_Beta);
+        }
+        else if (adjacentTriangles.size() == 1) 
+        {
+            const Triangle& tri = inputTriangles[adjacentTriangles[0]];
+            int idx3 = -1;
+            for (int idx : { pointToIndex[tri.p1], pointToIndex[tri.p2], pointToIndex[tri.p3] }) 
+            {
+                if (idx != idx1 && idx != idx2) 
+                {
+                    idx3 = idx;
+                    break;
+                }
+            }
+
+            Eigen::Vector3d vk = indexToPoint[idx3].toVector();
+
+            Eigen::Vector3d e_ij = vi - vj;
+            Eigen::Vector3d e_ik = vi - vk;
+            Eigen::Vector3d e_jk = vj - vk;
+
+            double angleOpposite = std::acos(e_jk.dot(-e_ik) / (e_jk.norm() * e_ik.norm()));
+            cotAlpha = 1.0 / std::tan(angleOpposite);
+            cotBeta = 0.0;
+        }
+        else continue;
+
+        double weight = cotAlpha + cotBeta;
+        Eigen::Vector3d contribution = weight * (vi - vj);
+
+        meanCurvatureVectors[idx1] += contribution;
+        meanCurvatureVectors[idx2] -= contribution;
+
+
+        double area = 0.0;
+        for (int triIdx : adjacentTriangles) area += inputTriangles[triIdx].getArea();
+        area /= 3.0;
+
+        vertexAreas[idx1] += area / 2.0;
+        vertexAreas[idx2] += area / 2.0;
+    }
+
+    std::vector<double> meanCurvatures(numVertices);
+    for (int i = 0; i < numVertices; ++i) 
+    {
+        double Ai = vertexAreas[i];
+        if (Ai > 0) 
+        {
+            Eigen::Vector3d Hi = (1.0 / (2.0 * Ai)) * meanCurvatureVectors[i];
+            meanCurvatures[i] = Hi.norm();
+        }
+        else meanCurvatures[i] = 0.0;
+    }
+
+    return meanCurvatures;
+}
+
+export void calculateAndAnalyzeCurvature(const std::vector<Triangle>& triangles) 
+{
+    std::vector<double> curvatures = getMeanCurvatures(triangles);
+
+    double mean = std::accumulate(curvatures.begin(), curvatures.end(), 0.0) / curvatures.size();
+    double variance = 0.0;
+    for (double c : curvatures) {
+        variance += (c - mean) * (c - mean);
+    }
+    variance /= curvatures.size();
+    double stdDev = std::sqrt(variance);
+
+    std::cout << "Mean Curvature: " << mean << "\n";
+    std::cout << "Standard Deviation: " << stdDev << "\n";
+}
+
+
+///////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
+
+// Hash functions
+struct PointHash {
+    std::size_t operator()(const Point& p) const {
+        return std::hash<double>()(p.x) ^ std::hash<double>()(p.y) ^ std::hash<double>()(p.z);
+    }
+};
+
+
+struct EdgeHash {
+    std::size_t operator()(const std::pair<Point, Point>& edge) const {
+        std::size_t h1 = PointHash()(edge.first);
+        std::size_t h2 = PointHash()(edge.second);
+        return h1 ^ (h2 << 1);
+    }
+};
+
+// Normalize edges
+std::pair<Point, Point> normalizeEdge(const Point& p1, const Point& p2) {
+    return (p1 < p2) ? std::make_pair(p1, p2) : std::make_pair(p2, p1);
+}
+
+// Build adjacency list
+export std::vector<std::vector<int>> buildAdjacencyList(const std::vector<Triangle>& triangles) {
+    std::unordered_map<std::pair<Point, Point>, std::vector<int>, EdgeHash> edgeMap;
+
+    for (size_t i = 0; i < triangles.size(); ++i) {
+        const auto& t = triangles[i];
+        std::vector<std::pair<Point, Point>> edges = {
+            normalizeEdge(t.p1, t.p2),
+            normalizeEdge(t.p2, t.p3),
+            normalizeEdge(t.p3, t.p1)
+        };
+
+        for (const auto& edge : edges) {
+            edgeMap[edge].push_back(i);
+        }
+    }
+
+    std::vector<std::vector<int>> adjacencyList(triangles.size());
+    for (const auto& [edge, indices] : edgeMap) {
+        for (size_t i = 0; i < indices.size(); ++i) {
+            for (size_t j = i + 1; j < indices.size(); ++j) {
+                adjacencyList[indices[i]].push_back(indices[j]);
+                adjacencyList[indices[j]].push_back(indices[i]);
+            }
+        }
+    }
+
+    return adjacencyList;
+}
+
+export std::pair<double, double> getLargestSurfaces(const std::vector<Triangle>& triangles, const std::vector<std::vector<int>>& adjacencyList) {
+    std::vector<bool> visited(triangles.size(), false);
+    std::vector<double> clusterAreas;
+
+    // BFS to calculate cluster areas
+    for (size_t i = 0; i < triangles.size(); ++i) {
+        if (visited[i]) continue;
+
+        std::queue<int> q;
+        q.push(i);
+        visited[i] = true;
+
+        double clusterArea = 0.0;
+        while (!q.empty()) {
+            int current = q.front();
+            q.pop();
+
+            clusterArea += triangles[current].getArea();
+
+            for (int neighbor : adjacencyList[current]) {
+                if (!visited[neighbor]) {
+                    visited[neighbor] = true;
+                    q.push(neighbor);
+                }
+            }
+        }
+
+        clusterAreas.push_back(clusterArea);
+    }
+
+    // Find the two largest areas
+    double largest = 0.0, secondLargest = 0.0;
+    for (double area : clusterAreas) {
+        if (area > largest) {
+            secondLargest = largest;
+            largest = area;
+        }
+        else if (area > secondLargest) {
+            secondLargest = area;
+        }
+    }
+
+    return { largest, secondLargest };
+}

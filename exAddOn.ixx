@@ -187,6 +187,38 @@ export double createDensityFunction(const std::vector<std::array<double, 3>>& in
     return meanVal;
 }
 
+export double getDirichletEnergy(double*** density, const int& resolution, double boxVolume)
+{
+    double dirichletEnergy = 0.0;
+    double h = 0.1;
+
+    for (int x = 0; x < resolution; ++x)
+    {
+        for (int y = 0; y < resolution; ++y)
+        {
+            for (int z = 0; z < resolution; ++z)
+            {
+                int xPrev = (x - 1 + resolution) % resolution;
+                int xNext = (x + 1) % resolution; 
+                int yPrev = (y - 1 + resolution) % resolution;
+                int yNext = (y + 1) % resolution;
+                int zPrev = (z - 1 + resolution) % resolution;
+                int zNext = (z + 1) % resolution;
+
+                double gradX = (density[xNext][y][z] - density[xPrev][y][z]) / (2.0 * h);
+                double gradY = (density[x][yNext][z] - density[x][yPrev][z]) / (2.0 * h);
+                double gradZ = (density[x][y][zNext] - density[x][y][zPrev]) / (2.0 * h);
+                double gradSquared = gradX * gradX + gradY * gradY + gradZ * gradZ;
+
+                dirichletEnergy += gradSquared;
+            }
+        }
+    }
+
+    dirichletEnergy *= (boxVolume / (resolution * resolution * resolution));
+    return dirichletEnergy;
+}
+
 export double*** createLaplacian(double*** density, int resol, double boxSize)
 {
     double*** laplacian = create3DArray(resol, resol, resol);

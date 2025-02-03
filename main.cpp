@@ -1967,11 +1967,8 @@ int main(int argc, char** argv)
                 std::wprintf(L"컷오프 값을 몇으로 할까?.\n");
                 std::cin >> cutoff;
 
-                double tolerance = 0.05;
-                std::wprintf(L"허용오차 값을 몇으로 할까?.\n");
-                std::cin >> tolerance;
 
-                int resolution = 32;
+                int resolution = 64;
                 //std::wprintf(L"해상도를 몇으로 할까?\n");
                 //std::cin >> resolution;
 
@@ -1989,47 +1986,17 @@ int main(int argc, char** argv)
                 lastFunc->myColor = col::white;
 
                 lastFunc->myPoints.clear();
-                int pointNumber = 0;
-                for (int x = 0; x < resolution; x++)
-                {
-                    for (int y = 0; y < resolution; y++)
-                    {
-                        for (int z = 0; z < resolution; z++)
-                        {
-                            if (density[x][y][z] > cutoff - tolerance && density[x][y][z] < cutoff + tolerance)
-                            {
-                                lastFunc->myPoints.push_back({ (double)x - (double)resolution / 2.0,(double)y - (double)resolution / 2.0,(double)z - (double)resolution / 2.0 });
-                                pointNumber++;
-                            }
-                        }
-                    }
-                }
 
                 double energy = getDirichletEnergy(density,resolution, (lastFunc->latticeConstant)*(lastFunc->latticeConstant)*(lastFunc->latticeConstant));
                 std::wprintf(L"이 밀도함수의 디리클레 에너지는 %lf이다.\n", energy);
 
-
-                Eigen::Tensor<double, 3> densityTensor(resolution, resolution, resolution);
-                for (int i = 0; i < resolution; ++i)
-                {
-                    for (int j = 0; j < resolution; ++j)
-                    {
-                        for (int k = 0; k < resolution; ++k)
-                        {
-                            densityTensor(i, j, k) = density[i][j][k];
-                        }
-                    }
-                }
-                lastFunc->triangles = getTrianglesFromScalar(densityTensor, 1.95, 0.05);
+                lastFunc->triangles = getTrianglesFromScalar(arrayToTensor(density, resolution), cutoff);
                 double surfaceArea = getAreaFromTriangles(lastFunc->triangles);
                 calculateAndAnalyzeCurvature(lastFunc->triangles);
                 std::wprintf(L"이 밀도함수의 표면적은 %lf이다.\n", surfaceArea);
-                auto adjacencyList = buildAdjacencyList(lastFunc->triangles);
-                auto largestSurf = getLargestSurfaces(lastFunc->triangles, adjacencyList);
+                auto largestSurf = getLargestSurfaces(lastFunc->triangles);
                 std::wprintf(L"가장 큰 곡면의 넓이는 %lf이고 두번째로 큰 곡면의 넓이는 %lf이다.\n", largestSurf.first, largestSurf.second);
 
-
-                std::wprintf(L"%d/%d의 점들이 입력되었다.\n", pointNumber, resolution * resolution * resolution);
             }
             else if (input == 48)
             {

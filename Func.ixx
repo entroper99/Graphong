@@ -1504,6 +1504,48 @@ export std::vector<Triangle> getTrianglesFromScalar(const Eigen::Tensor<double, 
     return triangles;
 }
 
+export std::vector<Triangle> getTrianglesFromScalar(const Eigen::Tensor<double, 3>& scalarField,double isoLevel) 
+{
+    const int dimX = scalarField.dimension(0);
+    const int dimY = scalarField.dimension(1);
+    const int dimZ = scalarField.dimension(2);
+
+    Eigen::MatrixXd GV(dimX * dimY * dimZ, 3);
+    Eigen::VectorXd GS(dimX * dimY * dimZ);
+
+    for (int z = 0; z < dimZ; z++) {
+        for (int y = 0; y < dimY; y++) {
+            for (int x = 0; x < dimX; x++) {
+                int idx = x + y * dimX + z * dimX * dimY;
+                GV.row(idx) << x, y, z;
+                GS(idx) = scalarField(x, y, z);
+            }
+        }
+    }
+
+
+    Eigen::MatrixXd V;
+    Eigen::MatrixXi F;
+    igl::marching_cubes(GS, GV, dimX, dimY, dimZ, isoLevel, V, F);
+
+    std::vector<Triangle> triangles;
+    triangles.reserve(F.rows());
+    for (int i = 0; i < F.rows(); i++) {
+        Triangle tri;
+        Eigen::Vector3d v1 = V.row(F(i, 0));
+        Eigen::Vector3d v2 = V.row(F(i, 1));
+        Eigen::Vector3d v3 = V.row(F(i, 2));
+
+        tri.p1 = Point(v1.x(), v1.y(), v1.z());
+        tri.p2 = Point(v2.x(), v2.y(), v2.z());
+        tri.p3 = Point(v3.x(), v3.y(), v3.z());
+
+        triangles.push_back(tri);
+    }
+
+    return triangles;
+}
+
 export double getAreaFromTriangles(const std::vector<Triangle>& triangles)
 {
     double totalArea = 0.0;
@@ -1714,8 +1756,24 @@ std::pair<Point, Point> normalizeEdge(const Point& p1, const Point& p2) {
     return (p1 < p2) ? std::make_pair(p1, p2) : std::make_pair(p2, p1);
 }
 
-// Build adjacency list
-export std::vector<std::vector<int>> buildAdjacencyList(const std::vector<Triangle>& triangles) {
+export Eigen::Tensor<double, 3>  arrayToTensor(double*** density, int resol)
+{
+    Eigen::Tensor<double, 3> densityTensor(resol, resol, resol);
+    for (int i = 0; i < resol; ++i)
+    {
+        for (int j = 0; j < resol; ++j)
+        {
+            for (int k = 0; k < resol; ++k)
+            {
+                densityTensor(i, j, k) = density[i][j][k];
+            }
+        }
+    }
+    return densityTensor;
+}
+
+export std::pair<double, double> getLargestSurfaces(const std::vector<Triangle>& triangles) {
+    // Build adjacency list inside the function
     std::unordered_map<std::pair<Point, Point>, std::vector<int>, EdgeHash> edgeMap;
 
     for (size_t i = 0; i < triangles.size(); ++i) {
@@ -1732,7 +1790,10 @@ export std::vector<std::vector<int>> buildAdjacencyList(const std::vector<Triang
     }
 
     std::vector<std::vector<int>> adjacencyList(triangles.size());
-    for (const auto& [edge, indices] : edgeMap) {
+    for (const auto& edgeMapEntry : edgeMap) {
+        const auto& edge = edgeMapEntry.first;
+        const auto& indices = edgeMapEntry.second;
+
         for (size_t i = 0; i < indices.size(); ++i) {
             for (size_t j = i + 1; j < indices.size(); ++j) {
                 adjacencyList[indices[i]].push_back(indices[j]);
@@ -1741,14 +1802,10 @@ export std::vector<std::vector<int>> buildAdjacencyList(const std::vector<Triang
         }
     }
 
-    return adjacencyList;
-}
-
-export std::pair<double, double> getLargestSurfaces(const std::vector<Triangle>& triangles, const std::vector<std::vector<int>>& adjacencyList) {
+    // Calculate largest surfaces using BFS
     std::vector<bool> visited(triangles.size(), false);
     std::vector<double> clusterAreas;
 
-    // BFS to calculate cluster areas
     for (size_t i = 0; i < triangles.size(); ++i) {
         if (visited[i]) continue;
 

@@ -1,5 +1,11 @@
 #define _SILENCE_ALL_CXX23_DEPRECATION_WARNINGS
 #include <SDL.h>
+#include <iostream>
+#include <vector>
+#include <array>
+#include <cmath>
+#include <random>
+#include <complex>
 #include <Eigen/Dense>
 #include <Eigen/Core>
 #include <unsupported/Eigen/CXX11/Tensor>
@@ -59,4 +65,56 @@ export Eigen::Matrix3d angleToMatrix(double xAngle, double yAngle, double zAngle
         0, 0, 1;
 
     return rotZ * rotY * rotX;
+}
+
+
+export double computeShellAverageAmplitude(const std::vector<std::array<double, 3>>& points,double boxX, double boxY, double boxZ,double kMag,int numSamples = 1000,bool   returnSquaredAmplitude = false)
+{
+    std::mt19937 rng(12345);
+    std::uniform_real_distribution<double> uniform(0.0, 1.0);
+
+    double accumulatedValue = 0.0;
+
+    const size_t N = points.size();
+
+    for (int i = 0; i < numSamples; i++)
+    {
+        double u = uniform(rng);
+        double v = uniform(rng);
+        double theta = std::acos(1.0 - 2.0 * u);
+        double phi = 2.0 * M_PI * v;
+
+        double kx_unit = std::sin(theta) * std::cos(phi);
+        double ky_unit = std::sin(theta) * std::sin(phi);
+        double kz_unit = std::cos(theta);
+
+        double kx = kMag * kx_unit;
+        double ky = kMag * ky_unit;
+        double kz = kMag * kz_unit;
+
+        std::complex<double> sumF(0.0, 0.0);
+
+        for (const auto& r : points)
+        {
+            double rx = r[0];
+            double ry = r[1];
+            double rz = r[2];
+
+            double dot = kx * rx + ky * ry + kz * rz;
+
+            double realPart = std::cos(dot);
+            double imagPart = -std::sin(dot);
+
+            sumF += std::complex<double>(realPart, imagPart);
+        }
+
+        double amp = std::abs(sumF);
+        double val = returnSquaredAmplitude ? (amp * amp) : amp;
+
+        accumulatedValue += val;
+    }
+
+    double meanVal = accumulatedValue / static_cast<double>(numSamples);
+
+    return meanVal;
 }

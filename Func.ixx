@@ -48,7 +48,6 @@ export struct Func
     inline static Eigen::Vector3d transVec;
     inline static Eigen::Matrix3d rotMat;
 
-    double period = 0.0;
     bool interLine = false;
 
     std::function<double(double, double, double)> scalarFunc;

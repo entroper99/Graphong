@@ -293,6 +293,8 @@ int main(int argc, char** argv)
             std::wprintf(L"\033[0;33m48. 회전 평행이동 테스트 : 표면적 vs 함수\033[0m\n");
             std::wprintf(L"\033[0;33m49. 고밀도 부분 추출\033[0m\n");
             std::wprintf(L"\033[0;33m50. LAMMPS -> 푸리에변환 파수벡터 구면평균 그래프\033[0m\n");
+            std::wprintf(L"\033[0;33m51. LAMMPS -> 푸리에변환 파수벡터 피크 분석\033[0m\n");
+
             std::wprintf(L"------------------▼아래에 값 입력-----------------\n");
 
             int input = 0;
@@ -2211,9 +2213,106 @@ int main(int argc, char** argv)
                     lastFunc->myPoints.push_back({ kVal,y,0 });
                 }
             }
+            else if (input == 51)
+            {
+                int dataIndex = 0;
+                std::wprintf(L"몇번째 데이터의 푸리에 구조인자를 구할까? (0 ~ %d).\n", funcSet.size() - 1);
+                std::cin >> dataIndex;
 
+                Func* lastFunc = ((Func*)funcSet[dataIndex]);
 
+                double boxSize = lastFunc->latticeConstant;
+                std::vector<Point> pts = lastFunc->myPoints;
+                std::vector<std::array<double, 3>> dPts;
+                dPts.reserve(pts.size());
+                for (int i = 0; i < pts.size(); i++)
+                {
+                    dPts.push_back({ pts[i].x, pts[i].y, pts[i].z });
+                }
 
+                double kMin = -10.0;
+                double kMax = 10.0;
+                double step = 0.1;
+
+                int Nx = static_cast<int>((kMax - kMin) / step) + 1;
+                int Ny = Nx;
+                int Nz = Nx;
+
+                std::vector<std::vector<std::vector<double>>> amplitudeGrid(
+                    Nx, std::vector<std::vector<double>>(Ny, std::vector<double>(Nz, 0.0))
+                );
+
+                for (int i = 0; i < Nx; i++)
+                {
+                    double kx = kMin + i * step;
+                    for (int j = 0; j < Ny; j++)
+                    {
+                        double ky = kMin + j * step;
+                        for (int k = 0; k < Nz; k++)
+                        {
+                            double kz = kMin + k * step;
+                            amplitudeGrid[i][j][k] = computeDirectionalAmplitude(dPts, kx, ky, kz, false);
+                        }
+                    }
+                }
+
+                auto isLocalMax = [&](int i, int j, int k)
+                    {
+                        double center = amplitudeGrid[i][j][k];
+                        for (int di = -1; di <= 1; di++)
+                        {
+                            for (int dj = -1; dj <= 1; dj++)
+                            {
+                                for (int dk = -1; dk <= 1; dk++)
+                                {
+                                    if (di == 0 && dj == 0 && dk == 0) continue;
+                                    double neighbor = amplitudeGrid[i + di][j + dj][k + dk];
+                                    if (neighbor > center) return false;
+                                }
+                            }
+                        }
+                        return true;
+                    };
+
+                struct Peak {
+                    double kx, ky, kz, amplitude;
+                };
+
+                std::vector<Peak> peaks;
+                peaks.reserve(Nx * Ny * Nz);
+
+                for (int i = 1; i < Nx - 1; i++)
+                {
+                    double kx = kMin + i * step;
+                    for (int j = 1; j < Ny - 1; j++)
+                    {
+                        double ky = kMin + j * step;
+                        for (int k = 1; k < Nz - 1; k++)
+                        {
+                            double kz = kMin + k * step;
+                            if (isLocalMax(i, j, k))
+                            {
+                                double amp = amplitudeGrid[i][j][k];
+                                peaks.push_back({ kx, ky, kz, amp });
+                            }
+                        }
+                    }
+                }
+
+                std::sort(peaks.begin(), peaks.end(),
+                    [](const Peak& a, const Peak& b) {
+                        return a.amplitude > b.amplitude;
+                    }
+                );
+
+                int topN = 20;
+                std::wprintf(L"\n=== Top %d local maxima peaks ===\n", topN);
+                for (int idx = 0; idx < topN && idx < static_cast<int>(peaks.size()); idx++)
+                {
+                    std::wprintf(L"%d: (%.2f, %.2f, %.2f) -> amplitude = %.5f\n",
+                        idx, peaks[idx].kx, peaks[idx].ky, peaks[idx].kz, peaks[idx].amplitude);
+                }
+            }
             else std::wprintf(L"잘못된 값이 입력되었다.\n");
         }
 

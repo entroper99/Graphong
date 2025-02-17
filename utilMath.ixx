@@ -118,3 +118,34 @@ export double computeShellAverageAmplitude(const std::vector<std::array<double, 
 
     return meanVal;
 }
+
+
+export double computeDirectionalAmplitude(
+    const std::vector<std::array<double, 3>>& points,
+    double kx,
+    double ky,
+    double kz,
+    bool returnSquaredAmplitude = false
+)
+{
+    std::complex<double> sumF(0.0, 0.0);
+
+    for (const auto& r : points)
+    {
+        double rx = r[0];
+        double ry = r[1];
+        double rz = r[2];
+
+        double dot = kx * rx + ky * ry + kz * rz;
+
+        // e^(-i dot) = cos(dot) - i*sin(dot)
+        double realPart = std::cos(dot);
+        double imagPart = -std::sin(dot);
+
+        sumF += std::complex<double>(realPart, imagPart);
+    }
+
+    double amp = std::abs(sumF);
+
+    return returnSquaredAmplitude ? (amp * amp) : amp;
+}

@@ -146,6 +146,7 @@
     <ClCompile Include="main.cpp" />
     <ClCompile Include="nanoTimer.ixx" />
     <ClCompile Include="randomRange.ixx" />
+    <ClCompile Include="selectOption.ixx" />
     <ClCompile Include="ThreadPool.ixx" />
     <ClCompile Include="utilFile.ixx" />
     <ClCompile Include="utilMath.ixx" />

@@ -28,6 +28,8 @@ export float zScale = 1.0;
 
 export bool visDataPoint = true;
 export bool visInterPoint = true;
+export bool visUI = true;
+export bool darkMode = true;
 
 export bool interLine = false;
 export bool crosshair = false;

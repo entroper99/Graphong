@@ -9,7 +9,7 @@ export SDL_Color inputCol()
     std::string str;
     std::wprintf(L"R,G,B 값을 입력해주세요. eg) 255,32,180 \n");
     std::wprintf(L"또는 알파벳으로 기준 색상 입력 \n");
-    std::wprintf(L"[a] white   [b] red   [c] green  [d] blue   [e] yellow   [f] pink   \n[g] purple   [h] skyBlue   [i] lightGreen   [j] orange\n");
+    std::wprintf(L"[a] white   [b] red   [c] green  [d] blue   [e] yellow   [f] pink   \n[g] purple   [h] skyBlue   [i] lightGreen   [j] orange   [k] black\n");
     std::cin >> str;
 
     if (str == "a") return { 0xff,0xff,0xff };
@@ -22,7 +22,7 @@ export SDL_Color inputCol()
     if (str == "h") return { 0x66,0xb4,0xd4 };
     if (str == "i") return { 0xb0,0xff,0xa8 };
     if (str == "j") return { 0xff,0xa0,0x53 };
-
+    if (str == "k") return { 0x00,0x00,0x00 };
 
     SDL_Color rtnCol;
     size_t pos = 0;

@@ -149,3 +149,20 @@ export double computeDirectionalAmplitude(
 
     return returnSquaredAmplitude ? (amp * amp) : amp;
 }
+
+
+export double getDebyeStructureFactor(const std::vector<std::array<double, 3>>& pts, double q, double cutoff) 
+{
+    size_t N = pts.size(); if (N < 2)return 1.0; double s = 0.0;
+    for (size_t i = 0; i < N; ++i) 
+    {
+        for (size_t j = i + 1; j < N; ++j) 
+        {
+            double dx = pts[j][0] - pts[i][0], dy = pts[j][1] - pts[i][1], dz = pts[j][2] - pts[i][2];
+            double r = std::sqrt(dx * dx + dy * dy + dz * dz); if (r < 1e-12)continue; if (cutoff > 0.0 && r >= cutoff)continue;
+            double w = 1.0; if (cutoff > 0.0) { double x = M_PI * r / cutoff; if (std::fabs(x) > 1e-12)w = std::sin(x) / x; }
+            double qr = q * r; double st = 1.0; if (std::fabs(qr) > 1e-12)st = std::sin(qr) / qr; s += st * w;
+        }
+    }
+    return 1.0 + 2.0 / (N * 1.0 * N * 1.0) * s;
+}

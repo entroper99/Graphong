@@ -192,6 +192,7 @@ export void selectOption()
     std::wprintf(L"\033[0;33m49. 고밀도 부분 추출\033[0m\n");
     std::wprintf(L"\033[0;33m50. LAMMPS -> 푸리에변환 파수벡터 구면평균 그래프\033[0m\n");
     std::wprintf(L"\033[0;33m51. LAMMPS -> 푸리에변환 파수벡터 피크 분석\033[0m\n");
+    std::wprintf(L"\033[0;33m52. Debye Structure Factor 피크 분석\033[0m\n");
 
     std::wprintf(L"------------------▼아래에 값 입력-----------------\n");
 
@@ -2240,5 +2241,31 @@ export void selectOption()
                 idx, peaks[idx].kx, peaks[idx].ky, peaks[idx].kz, peaks[idx].amplitude);
         }
     }
+    else if (input == 52)
+    {
+        int dataIndex = 0;
+        std::wprintf(L"몇번째 데이터의 Debye 구조인자를 구할까? (0 ~ %d).\n", funcSet.size() - 1);
+        std::cin >> dataIndex;
+
+        Func* lastFunc = ((Func*)funcSet[dataIndex]);
+
+        double boxSize = lastFunc->latticeConstant;
+
+        std::vector<Point> pts = lastFunc->myPoints;
+        std::vector<std::array<double, 3>> dPts;
+        for (int i = 0; i < pts.size(); i++) dPts.push_back({ pts[i].x,pts[i].y,pts[i].z });
+
+        lastFunc->funcType = funcFlag::dim3;
+        std::wprintf(L"색을 뭘로 할까?\n");
+        lastFunc->myColor = inputCol();
+
+        lastFunc->myPoints.clear();
+
+        for (double kVal = 0; kVal <= 10; kVal += 0.02)
+        {
+            double y = getDebyeStructureFactor(dPts, kVal, 4.5);
+            lastFunc->myPoints.push_back({ kVal,y,0 });
+        }
+        }
     else std::wprintf(L"잘못된 값이 입력되었다.\n");
 }

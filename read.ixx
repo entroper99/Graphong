@@ -134,7 +134,7 @@ export int readXY(std::wstring file, int startLine, int endLine, int xCol, int y
                     else if (thisLineCurrentNumber == yCol)
                     {
                         targetFunc->myPoints.push_back({ prevValX, floatValue, 0 });
-                        std::wprintf(L"%d번째 데이터 (%f,%f)를 데이터셋에 넣었다.\n", targetFunc->myPoints.size(), prevValX, floatValue);
+                        //std::wprintf(L"%d번째 데이터 (%f,%f)를 데이터셋에 넣었다.\n", targetFunc->myPoints.size(), prevValX, floatValue);
                     }
                     numberReaded++;
                     numStartIndex = -1;
@@ -262,7 +262,7 @@ export int readXYZ(std::wstring file, int startLine, int endLine, int xCol, int 
                     if (findFirst && findSecond && findThird)
                     {
                         targetFunc->myPoints.push_back({ firstVal, secondVal, thirdVal });
-                        std::wprintf(L"%d번째 데이터 (%f,%f,%f)를 데이터셋에 넣었다.\n", targetFunc->myPoints.size(), firstVal, secondVal, thirdVal);
+                        //std::wprintf(L"%d번째 데이터 (%f,%f,%f)를 데이터셋에 넣었다.\n", targetFunc->myPoints.size(), firstVal, secondVal, thirdVal);
                         findFirst = false;
                         findSecond = false;
                         findThird = false;
@@ -390,7 +390,7 @@ export int readTrjFile(std::wstring file, int startLine, int endLine, int xCol, 
                         if (skipThis == false)
                         {
                             targetFunc->myPoints.push_back({ firstVal, secondVal, thirdVal });
-                            std::wprintf(L"%d번째 데이터 (%f,%f,%f)를 데이터셋에 넣었다.\n", targetFunc->myPoints.size(), firstVal, secondVal, thirdVal);
+                            //std::wprintf(L"%d번째 데이터 (%f,%f,%f)를 데이터셋에 넣었다.\n", targetFunc->myPoints.size(), firstVal, secondVal, thirdVal);
                         }
                         findFirst = false;
                         findSecond = false;

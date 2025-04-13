@@ -193,6 +193,7 @@ export void selectOption()
     std::wprintf(L"\033[0;33m50. LAMMPS -> 푸리에변환 파수벡터 구면평균 그래프\033[0m\n");
     std::wprintf(L"\033[0;33m51. LAMMPS -> 푸리에변환 파수벡터 피크 분석\033[0m\n");
     std::wprintf(L"\033[0;33m52. Debye Structure Factor 피크 분석\033[0m\n");
+    std::wprintf(L"\033[0;33m53. DSF Overlap 계산\033[0m\n");
 
     std::wprintf(L"------------------▼아래에 값 입력-----------------\n");
 
@@ -2263,9 +2264,194 @@ export void selectOption()
 
         for (double kVal = 0; kVal <= 10; kVal += 0.02)
         {
-            double y = getDebyeStructureFactor(dPts, kVal, 4.5);
+            double y = getDebyeStructureFactor(dPts, kVal, 4.5, boxSize);
             lastFunc->myPoints.push_back({ kVal,y,0 });
         }
+    }
+    else if (input == 53)
+    {
+        const double maxQ = 10.0;
+        const double binQ = 0.1;
+        std::vector<std::vector<double>> firstTrj;
+        std::vector<std::vector<double>> secondTrj;
+        {
+            std::wstring file = L"";
+            std::wprintf(L"첫번째 trj를 선택해주세요.n");
+            file = openFileDialog();
+            std::wprintf(L"파일 %ls 를 대상으로 설정하였다.\n", file.c_str());
+            std::ifstream in(file);
+            if (in.is_open())
+            {
+                std::string str;
+                in.seekg(0, std::ios::end);
+                size_t size = in.tellg();
+                str.resize(size);
+                in.seekg(0, std::ios::beg);
+                in.read(&str[0], size);
+                in.close();
+                int timeCount = 1;
+                while (1)
+                {
+                    std::wprintf(L"First Trj : %d\n", timeCount);
+                    timeCount++;
+                    double width = 0.0;
+                    std::size_t box_pos = str.find("BOX BOUNDS");
+                    int number_count = 0;
+                    if (box_pos != std::string::npos)
+                    {
+                        for (std::size_t i = box_pos; i < str.size(); ++i)
+                        {
+                            if (isdigit(str[i]) || str[i] == '-' || str[i] == '.')
+                            {
+                                double temp = std::stod(str.substr(i));
+                                number_count++;
+                                if (number_count == 2)
+                                {
+                                    width = temp;
+                                    break;
+                                }
+                                while (i < str.size() && (isdigit(str[i]) || str[i] == '-' || str[i] == '.' || str[i] == 'e' || str[i] == '+'))
+                                    i++;
+                            }
+                        }
+                    }
+                    readTrjFile(file, 9, -1, 2, 3, 4, 1, 2);
+                    Func* tgtFunc = ((Func*)funcSet[funcSet.size() - 1]);
+                    tgtFunc->latticeConstant = width;
+                    tgtFunc->scalarCalc();
+                    tgtFunc->translation(-width / 2.0, -width / 2.0, -width / 2.0);
+                    std::vector<Point> pts = tgtFunc->myPoints;
+                    std::vector<std::array<double, 3>> dPts;
+                    for (int i = 0; i < pts.size(); i++)
+                        dPts.push_back({ pts[i].x, pts[i].y, pts[i].z });
+                    tgtFunc->funcType = funcFlag::dim3;
+                    tgtFunc->myPoints.clear();
+                    std::vector<double> dsf;
+                    for (double kVal = 0; kVal <= maxQ; kVal += binQ)
+                    {
+                        double y = getDebyeStructureFactor(dPts, kVal, 4.5, width);
+                        dsf.push_back(y);
+                    }
+                    firstTrj.push_back(dsf);
+                    delete tgtFunc;
+                    std::size_t first = str.find("ITEM: TIMESTEP");
+                    if (first != std::string::npos)
+                    {
+                        std::size_t second = str.find("ITEM: TIMESTEP", first + 1);
+                        if (second == std::string::npos)
+                            break;
+                        else
+                            str.erase(0, second);
+                    }
+                }
+            }
+            else std::wprintf(L"파일을 읽는데 실패하였습니다.\n");
         }
+
+
+        {
+            std::wstring file = L"";
+            std::wprintf(L"두번째 trj를 선택해주세요.n");
+            file = openFileDialog();
+            std::wprintf(L"파일 %ls 를 대상으로 설정하였다.\n", file.c_str());
+            std::ifstream in(file);
+            if (in.is_open())
+            {
+                std::string str;
+                in.seekg(0, std::ios::end);
+                size_t size = in.tellg();
+                str.resize(size);
+                in.seekg(0, std::ios::beg);
+                in.read(&str[0], size);
+                in.close();
+
+                int timeCount = 1;
+                while (1)
+                {
+                    std::wprintf(L"Second Trj : %d\n",timeCount);
+                    timeCount++;
+                    double width = 0.0;
+                    std::size_t box_pos = str.find("BOX BOUNDS");
+                    int number_count = 0;
+                    if (box_pos != std::string::npos)
+                    {
+                        for (std::size_t i = box_pos; i < str.size(); ++i)
+                        {
+                            if (isdigit(str[i]) || str[i] == '-' || str[i] == '.')
+                            {
+                                double temp = std::stod(str.substr(i));
+                                number_count++;
+                                if (number_count == 2)
+                                {
+                                    width = temp;
+                                    break;
+                                }
+                                while (i < str.size() && (isdigit(str[i]) || str[i] == '-' || str[i] == '.' || str[i] == 'e' || str[i] == '+'))
+                                    i++;
+                            }
+                        }
+                    }
+                    readTrjFile(file, 9, -1, 2, 3, 4, 1, 2);
+                    Func* tgtFunc = ((Func*)funcSet[funcSet.size() - 1]);
+                    tgtFunc->latticeConstant = width;
+                    tgtFunc->scalarCalc();
+                    tgtFunc->translation(-width / 2.0, -width / 2.0, -width / 2.0);
+                    std::vector<Point> pts = tgtFunc->myPoints;
+                    std::vector<std::array<double, 3>> dPts;
+                    for (int i = 0; i < pts.size(); i++)
+                        dPts.push_back({ pts[i].x, pts[i].y, pts[i].z });
+                    tgtFunc->funcType = funcFlag::dim3;
+                    tgtFunc->myPoints.clear();
+                    std::vector<double> dsf;
+                    for (double kVal = 0; kVal <= maxQ; kVal += binQ)
+                    {
+                        double y = getDebyeStructureFactor(dPts, kVal, 4.5, width);
+                        dsf.push_back(y);
+                    }
+                    secondTrj.push_back(dsf);
+                    delete tgtFunc;
+                    std::size_t first = str.find("ITEM: TIMESTEP");
+                    if (first != std::string::npos)
+                    {
+                        std::size_t second = str.find("ITEM: TIMESTEP", first + 1);
+                        if (second == std::string::npos)
+                            break;
+                        else
+                            str.erase(0, second);
+                    }
+                }
+            }
+            else  std::wprintf(L"파일을 읽는데 실패하였습니다.\n");
+        }
+        size_t nKValues = firstTrj[0].size();
+        std::vector<std::array<double, 3>> dsfOverlap;
+        for (size_t kIdx = 0; kIdx < nKValues; ++kIdx)
+        {
+            double kVal = kIdx * binQ;
+            if (kVal > maxQ + 1e-12)
+                break;
+            std::vector<double> distribution1;
+            std::vector<double> distribution2;
+            for (size_t i = 0; i < firstTrj.size(); ++i)
+            {
+                if (kIdx < firstTrj[i].size())
+                    distribution1.push_back(firstTrj[i][kIdx]);
+            }
+            for (size_t i = 0; i < secondTrj.size(); ++i)
+            {
+                if (kIdx < secondTrj[i].size())
+                    distribution2.push_back(secondTrj[i][kIdx]);
+            }
+            double distance = calculateHellingerSquaredAutoBins(distribution1, distribution2);
+            dsfOverlap.push_back({ kVal, distance, 0.0 });
+        }
+
+
+        Func* lastFunc = new Func(funcFlag::dim2);
+
+        std::wprintf(L"색을 뭘로 할까?\n");
+        lastFunc->myColor = inputCol();
+        for (const auto& entry : dsfOverlap) lastFunc->myPoints.push_back({ entry[0],entry[1],0 });
+    }
     else std::wprintf(L"잘못된 값이 입력되었다.\n");
 }

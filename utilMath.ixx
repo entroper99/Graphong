@@ -344,3 +344,66 @@ export double calculateHellingerSquaredAutoBins(const std::vector<double>& data1
 
     return h_squared;
 }
+
+export double calculateHellingerSquaredParametric(const std::vector<double>& data1, const std::vector<double>& data2)
+{
+    if (data1.empty() && data2.empty()) return 0.0;
+    if (data1.empty() || data2.empty()) return 1.0;
+
+    double mean1 = 0.0;
+    for (double x : data1)
+        mean1 += x;
+    mean1 /= static_cast<double>(data1.size());
+
+    double mean2 = 0.0;
+    for (double x : data2)
+        mean2 += x;
+    mean2 /= static_cast<double>(data2.size());
+
+    double var1 = 0.0;
+    for (double x : data1)
+        var1 += (x - mean1) * (x - mean1);
+    var1 /= static_cast<double>(data1.size());
+
+    double var2 = 0.0;
+    for (double x : data2)
+        var2 += (x - mean2) * (x - mean2);
+    var2 /= static_cast<double>(data2.size());
+
+    double sigma1 = std::sqrt(var1);
+    double sigma2 = std::sqrt(var2);
+
+    if (sigma1 < std::numeric_limits<double>::epsilon() && sigma2 < std::numeric_limits<double>::epsilon())
+        return (std::fabs(mean1 - mean2) < std::numeric_limits<double>::epsilon()) ? 0.0 : 1.0;
+
+    if (sigma1 < std::numeric_limits<double>::epsilon())
+        sigma1 = std::numeric_limits<double>::epsilon();
+    if (sigma2 < std::numeric_limits<double>::epsilon())
+        sigma2 = std::numeric_limits<double>::epsilon();
+
+    double denom = sigma1 * sigma1 + sigma2 * sigma2;
+    double bc = std::sqrt((2.0 * sigma1 * sigma2) / denom) * std::exp(-((mean1 - mean2) * (mean1 - mean2)) / (4.0 * denom));
+    double h_squared = 1.0 - bc;
+    h_squared = std::max(0.0, std::min(1.0, h_squared));
+    return h_squared;
+}
+
+export double calculateCohensD(const std::vector<double>& data1, const std::vector<double>& data2)
+{
+    if (data1.empty() || data2.empty()) return std::numeric_limits<double>::quiet_NaN();
+    double sum1 = 0.0, sum2 = 0.0;
+    for (double x : data1) sum1 += x;
+    for (double x : data2) sum2 += x;
+    double mean1 = sum1 / static_cast<double>(data1.size());
+    double mean2 = sum2 / static_cast<double>(data2.size());
+    double sqSum1 = 0.0, sqSum2 = 0.0;
+    for (double x : data1) sqSum1 += (x - mean1) * (x - mean1);
+    for (double x : data2) sqSum2 += (x - mean2) * (x - mean2);
+    double var1 = (data1.size() > 1) ? (sqSum1 / static_cast<double>(data1.size() - 1)) : 0.0;
+    double var2 = (data2.size() > 1) ? (sqSum2 / static_cast<double>(data2.size() - 1)) : 0.0;
+    double pooledVar = (((data1.size() - 1) * var1) + ((data2.size() - 1) * var2)) / static_cast<double>(data1.size() + data2.size() - 2);
+    double pooledSD = std::sqrt(pooledVar);
+    if (pooledSD < std::numeric_limits<double>::epsilon()) return std::numeric_limits<double>::quiet_NaN();
+    return (mean1 - mean2) / pooledSD;
+}
+
